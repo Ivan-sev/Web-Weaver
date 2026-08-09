@@ -1,0 +1,1137 @@
+﻿using System;
+using System.Linq;
+using System.Collections.Generic;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Shapes;
+using Microsoft.Win32;
+using WebWeaver.Controls;
+using WebWeaver.Models;
+using WebWeaver.Services;
+
+namespace WebWeaver
+{
+    /// <summary>
+    /// Логика взаимодействия для файла MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        // ── Состояние ────────────────────────────────────────────────────
+        private readonly List<NodeControl> _nodes = new();
+        private readonly List<ConnectionModel> _connections = new();
+        private readonly List<ConnectionArrow> _arrows = new();
+
+        private double _scale = 1.0;
+        private double _offsetX = 0;
+        private double _offsetY = 0;
+
+        // Панорамирование
+        private bool _isPanning;
+        private Point _panStart;
+
+        // Соединение
+        private NodeControl? _connectSource;
+        private bool _connectFromLeft; // true = начали с левого порта
+        private System.Windows.Shapes.Line? _tempLine;
+
+        // Выделение
+        private NodeControl? _selectedNode;
+
+        // Инфопанель
+        private bool _infoPanelVisible;
+        private bool _infoPanelIsLarge;
+
+        // ── Текущий файл (для перезаписи) ────────────────────────────────
+        private string? _currentFilePath;
+
+        public MainWindow()
+        {
+            // ВАЖНО: до InitializeComponent
+            _gridHost = new VisualHost(_gridVisual);
+
+            InitializeComponent();
+
+            Loaded += MainWindow_Loaded;
+            SizeChanged += (_, _) => RedrawGrid();
+            KeyDown += MainWindow_KeyDown;
+
+            infoPanel.SaveRequested += InfoPanel_SaveRequested;
+            infoPanel.CancelRequested += HideInfoPanel;
+            infoPanel.LinkNodeRequested += id =>
+            {
+                var ctrl = _nodes.FirstOrDefault(n => n.Model.Id == id);
+                if (ctrl != null) FocusNode(ctrl);
+            };
+        }
+
+        private void MainWindow_Loaded(object s, RoutedEventArgs e)
+        {
+            ApplyTransform();
+            RedrawGrid();
+            SetStatus("Готово. ПКМ по карте — создать ноду.");
+
+            // Аргумент командной строки
+            var args = Environment.GetCommandLineArgs();
+            if (args.Length > 1 && System.IO.File.Exists(args[1]))
+                OpenMapFromPath(args[1]);
+        }
+
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            // Отмена по Escape
+            if (e.Key == Key.Escape)
+            {
+                // 1. Отмена создания связи
+                if (_connectSource != null)
+                {
+                    _connectSource = null;
+                    ClearTempLine(); // если метод называется так
+                    SetStatus("Соединение отменено.");
+                    e.Handled = true;
+                    return;
+                }
+
+                // 2. Закрытие информационной панели
+                if (_infoPanelVisible)
+                {
+                    HideInfoPanel();
+                    e.Handled = true;
+                    return;
+                }
+            }
+
+            // Создать новую ноду
+            if (e.Key == Key.Insert)
+            {
+                BtnNewNode_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
+
+            // Горячие клавиши с Ctrl
+            if (Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                switch (e.Key)
+                {
+                    case Key.S: // Ctrl + S -> Сохранить
+                        BtnSave_Click(this, new RoutedEventArgs());
+                        e.Handled = true;
+                        break;
+
+                    case Key.O: // Ctrl + O -> Открыть
+                        BtnOpen_Click(this, new RoutedEventArgs());
+                        e.Handled = true;
+                        break;
+
+                    case Key.F: // Ctrl + F -> Найти ноду
+                        BtnFindNode_Click(this, new RoutedEventArgs());
+                        e.Handled = true;
+                        break;
+                    case Key.Delete: // Ctrl + Delete -> Очистить всё
+                        BtnClearAll_Click(this, new RoutedEventArgs());
+                        e.Handled = true;
+                        break;
+                        
+                    case Key.OemPlus: // Ctrl + "+" -> Приблизить
+                        BtnZoomIn_Click(this, new RoutedEventArgs());
+                        e.Handled = true;
+                        break;
+
+                    case Key.OemMinus: // Ctrl + "-" -> Отдалить
+                        BtnZoomOut_Click(this, new RoutedEventArgs());
+                        e.Handled = true;
+                        break;
+
+                    case Key.Home: // Ctrl + Home -> Сбросить вид
+                        BtnResetView_Click(this, new RoutedEventArgs());
+                        e.Handled = true;
+                        break;
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // ТРАНСФОРМАЦИЯ КАРТЫ
+        // ═══════════════════════════════════════════════════════════════
+        private void ApplyTransform()
+        {
+            // Ограничение масштаба
+            _scale = Math.Max(AppSettings.ZoomMin, Math.Min(AppSettings.ZoomMax, _scale));
+
+            scaleT.ScaleX = _scale;
+            scaleT.ScaleY = _scale;
+            translateT.X = _offsetX;
+            translateT.Y = _offsetY;
+
+            tbZoom.Text = $"{_scale * 100:F0}%";
+            RedrawGrid();
+            RedrawArrows();
+        }
+
+        private readonly DrawingVisual _gridVisual = new();
+        private VisualHost? _gridHost;   // инициализируется в конструкторе
+
+        private void RedrawGrid()
+        {
+            double w = canvasBorder.ActualWidth;
+            double h = canvasBorder.ActualHeight;
+            if (w <= 0 || h <= 0) return;
+
+            double spacing = AppSettings.GridSpacing * _scale;
+
+            using (var dc = _gridVisual.RenderOpen())
+            {
+                // При слишком мелкой сетке — не рисовать
+                if (spacing < 8)
+                {
+                    // Просто заливка без точек
+                    // dc остаётся пустым — холст чистый
+                    return;
+                }
+
+                var brush = new SolidColorBrush(AppSettings.GridDotColor);
+                brush.Freeze();
+
+                double startX = _offsetX % spacing;
+                double startY = _offsetY % spacing;
+
+                int cols = (int)(w / spacing) + 1;
+                int rows = (int)(h / spacing) + 1;
+
+                // Защита: не более 40000 точек
+                if (cols * rows > 40000)
+                {
+                    // Разредить сетку в 2 раза
+                    spacing *= 2;
+                    startX = _offsetX % spacing;
+                    startY = _offsetY % spacing;
+                    cols = (int)(w / spacing) + 1;
+                    rows = (int)(h / spacing) + 1;
+                }
+
+                for (int ix = 0; ix <= cols; ix++)
+                    for (int iy = 0; iy <= rows; iy++)
+                        dc.DrawEllipse(brush, null,
+                            new Point(startX + ix * spacing, startY + iy * spacing),
+                            1.5, 1.5);
+            }
+
+            if (_gridHost != null && !gridCanvas.Children.Contains(_gridHost))
+                gridCanvas.Children.Add(_gridHost);
+        }
+
+        //private readonly VisualHost _gridHost;
+
+        // ═══════════════════════════════════════════════════════════════
+        // СОБЫТИЯ МЫШИ НА КАРТЕ
+        // ═══════════════════════════════════════════════════════════════
+        private void MainCanvas_MouseWheel(object s, MouseWheelEventArgs e)
+        {
+            double oldScale = _scale;
+            double delta = e.Delta > 0 ? AppSettings.ZoomStep : -AppSettings.ZoomStep;
+            double newScale = Math.Max(AppSettings.ZoomMin,
+                             Math.Min(AppSettings.ZoomMax, _scale + delta));
+
+            if (Math.Abs(newScale - oldScale) < 0.001) return;
+
+            // Масштабировать относительно позиции курсора
+            var mousePos = e.GetPosition(canvasBorder);
+
+            _offsetX = mousePos.X - (mousePos.X - _offsetX) * (newScale / oldScale);
+            _offsetY = mousePos.Y - (mousePos.Y - _offsetY) * (newScale / oldScale);
+            _scale = newScale;
+
+            ApplyTransform();
+            e.Handled = true;
+        }
+
+        private void MainCanvas_MouseLeftButtonDown(object s, MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 2)
+            {
+                HideInfoPanel();
+                return;
+            }
+            // Начать панорамирование средней кнопкой или Alt+ЛКМ
+            if (Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt))
+            {
+                _isPanning = true;
+                _panStart = e.GetPosition(canvasBorder);
+                mainCanvas.CaptureMouse();
+                Cursor = Cursors.ScrollAll;
+                return;
+            }
+            DeselectAll();
+        }
+
+        private void MainCanvas_MouseLeftButtonUp(object s, MouseButtonEventArgs e)
+        {
+            if (_isPanning)
+            {
+                _isPanning = false;
+                mainCanvas.ReleaseMouseCapture();
+                Cursor = Cursors.Arrow;
+            }
+        }
+
+        private void MainCanvas_MouseMove(object s, MouseEventArgs e)
+        {
+            if (_isPanning)
+            {
+                var cur = e.GetPosition(canvasBorder);
+                _offsetX += cur.X - _panStart.X;
+                _offsetY += cur.Y - _panStart.Y;
+                _panStart = cur;
+
+                // Применять трансформ напрямую без RedrawArrows — быстро
+                scaleT.ScaleX = _scale;
+                scaleT.ScaleY = _scale;
+                translateT.X = _offsetX;
+                translateT.Y = _offsetY;
+                RedrawGrid();
+                return;
+            }
+
+            // Временная линия соединения
+            if (_tempLine != null && _connectSource != null)
+            {
+                var pos = e.GetPosition(mainCanvas);
+                _tempLine.X2 = pos.X;
+                _tempLine.Y2 = pos.Y;
+            }
+        }
+
+        // В обработчике ПКМ по карте:
+        private void MainCanvas_MouseRightButtonUp(object s, MouseButtonEventArgs e)
+        {
+            if (_connectSource != null) { CancelConnection(); return; }
+
+            var screenPos = e.GetPosition(canvasBorder);
+            var canvasPos = ScreenToCanvas(screenPos);
+
+            var cm = new ContextMenu();
+            var mi = new MenuItem { Header = "➕ Создать ноду" };
+            mi.Click += (_, _) =>
+            {
+            var model = new NodeModel
+            {
+                X = canvasPos.X,
+                Y = canvasPos.Y,
+                Name = "Новая нода",
+                BackgroundColorHex = $"#{AppSettings.NodeDefaultBackground.R:X2}{AppSettings.NodeDefaultBackground.G:X2}{AppSettings.NodeDefaultBackground.B:X2}",
+                HeaderColorHex = $"#{AppSettings.NodeHeaderBackground.R:X2}{AppSettings.NodeHeaderBackground.G:X2}{AppSettings.NodeHeaderBackground.B:X2}",
+                TextColorHex = $"#{AppSettings.NodeDefaultText.R:X2}{AppSettings.NodeDefaultText.G:X2}{AppSettings.NodeDefaultText.B:X2}",
+                FontFamily = AppSettings.NodeDefaultFontFamily,
+                FontSize = AppSettings.NodeDefaultFontSize,
+
+                Width = AppSettings.NodeDefaultWidth,
+                Height = AppSettings.NodeDefaultHeight,
+            };
+            ShowInfoPanelForCreate(model);
+            };
+            cm.Items.Add(mi);
+            cm.IsOpen = true;
+            e.Handled = true;
+        }
+
+        private Point ScreenToCanvas(Point screenPoint)
+        {
+            return new Point(
+                (screenPoint.X - _offsetX) / _scale,
+                (screenPoint.Y - _offsetY) / _scale);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // СОЗДАНИЕ / РЕДАКТИРОВАНИЕ НОД
+        // ═══════════════════════════════════════════════════════════════
+        private void CreateNode(Point canvasPos)
+        {
+            // Учитываем текущий масштаб и смещение
+            var model = new NodeModel
+            {
+                X = (canvasPos.X - _offsetX / _scale),
+                Y = (canvasPos.Y - _offsetY / _scale),
+            };
+            ShowInfoPanelForCreate(model);
+        }
+
+        private void BtnNewNode_Click(object s, RoutedEventArgs e)
+        {
+            // Создать в центре видимой области
+            double cx = (canvasBorder.ActualWidth / 2 - _offsetX) / _scale;
+            double cy = (canvasBorder.ActualHeight / 2 - _offsetY) / _scale;
+            CreateNode(new Point(cx, cy));
+        }
+
+        private void TextBlock_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            MessageBox.Show("Я еще не сделал!");
+        }
+
+        private void AddNodeControl(NodeModel model)
+        {
+            var ctrl = new NodeControl(model);
+
+            ctrl.NodeMoved += NodeCtrl_NodeMoved;
+            ctrl.Resized += (c, _) => NodeCtrl_NodeMoved(c);
+            ctrl.RequestConnectFrom += NodeCtrl_RequestConnectFrom;
+            ctrl.RequestConnectFromLeft += NodeCtrl_RequestConnectFromLeft;
+            ctrl.DoubleClicked += c => ShowInfoPanelForView(c.Model);
+            
+            ctrl.RightClicked += (c, _) => ShowNodeContextMenu(c);
+
+            Canvas.SetLeft(ctrl, model.X);
+            Canvas.SetTop(ctrl, model.Y);
+            mainCanvas.Children.Add(ctrl);
+            _nodes.Add(ctrl);
+        }
+
+        private void ShowNodeContextMenu(NodeControl ctrl)
+        {
+            SelectNode(ctrl);
+            var cm = new ContextMenu();
+
+            var miEdit = new MenuItem { Header = "✏️ Редактировать" };
+            miEdit.Click += (_, _) => ShowInfoPanelForEdit(ctrl.Model);
+            cm.Items.Add(miEdit);
+
+            var miView = new MenuItem { Header = "📖 Открыть блокнот" };
+            miView.Click += (_, _) => ShowInfoPanelForView(ctrl.Model);
+            cm.Items.Add(miView);
+
+            var miDup = new MenuItem { Header = "📋 Дублировать" };
+            miDup.Click += (_, _) => DuplicateNode(ctrl);
+            cm.Items.Add(miDup);
+
+            var miConnect = new MenuItem { Header = "🔗 Начать соединение" };
+            miConnect.Click += (_, _) => StartConnection(ctrl);
+            cm.Items.Add(miConnect);
+
+            var miDisconn = new MenuItem { Header = "✂️ Удалить все связи" };
+            miDisconn.Click += (_, _) => RemoveAllConnections(ctrl);
+            cm.Items.Add(miDisconn);
+
+            cm.Items.Add(new Separator());
+
+            var miColor = new MenuItem { Header = "🎨 Быстро изменить цвет заголовка" };
+            miColor.Click += (_, _) => QuickColorPick(ctrl);
+            cm.Items.Add(miColor);
+
+            cm.Items.Add(new Separator());
+
+            var miDel = new MenuItem { Header = "🗑 Удалить ноду", Foreground = Brushes.Salmon };
+            miDel.Click += (_, _) => DeleteNode(ctrl);
+            cm.Items.Add(miDel);
+
+            cm.IsOpen = true;
+        }
+
+        private void DeleteNode(NodeControl ctrl)
+        {
+            mainCanvas.Children.Remove(ctrl);
+            _nodes.Remove(ctrl);
+
+            // Удалить связанные соединения
+            var toRemove = _connections
+                .Where(c => c.FromNodeId == ctrl.Model.Id || c.ToNodeId == ctrl.Model.Id)
+                .ToList();
+            foreach (var c in toRemove) RemoveConnection(c);
+
+            // Убрать ссылки из других нод
+            foreach (var n in _nodes)
+                n.Model.ConnectedTo.Remove(ctrl.Model.Id);
+
+            if (_selectedNode == ctrl) _selectedNode = null;
+            SetStatus($"Нода «{ctrl.Model.Name}» удалена.");
+        }
+
+        private void DuplicateNode(NodeControl ctrl)
+        {
+            var m2 = new NodeModel
+            {
+                Name = ctrl.Model.Name + " (копия)",
+                Text = ctrl.Model.Text,
+                X = ctrl.Model.X + 30,
+                Y = ctrl.Model.Y + 30,
+                Width = ctrl.Model.Width,
+                Height = ctrl.Model.Height,
+                BackgroundColorHex = ctrl.Model.BackgroundColorHex,
+                HeaderColorHex = ctrl.Model.HeaderColorHex,
+                TextColorHex = ctrl.Model.TextColorHex,
+                FontFamily = ctrl.Model.FontFamily,
+                FontSize = ctrl.Model.FontSize,
+                ImagePath = ctrl.Model.ImagePath,
+            };
+            AddNodeControl(m2);
+        }
+
+        private void QuickColorPick(NodeControl ctrl)
+        {
+            var colors = new[]
+            {
+                "#3C82C8", "#C84040", "#40C870", "#C89040",
+                "#8040C8", "#40B8C8", "#C84090", "#808080"
+            };
+            var cm = new ContextMenu();
+            foreach (var hex in colors)
+            {
+                var mi = new MenuItem
+                {
+                    Header = "  ",
+                    Background = new SolidColorBrush(
+                        (Color)ColorConverter.ConvertFromString(hex)!)
+                };
+                mi.Click += (_, _) =>
+                {
+                    ctrl.Model.HeaderColorHex = hex;
+                    ctrl.Refresh();
+                    RedrawArrows();
+                };
+                cm.Items.Add(mi);
+            }
+            cm.IsOpen = true;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // СОЕДИНЕНИЯ
+        // ═══════════════════════════════════════════════════════════════
+        private void StartConnection(NodeControl source)
+        {
+            _connectSource = source;
+            var sp = source.GetRightPortCenter();
+            _tempLine = new Line
+            {
+                X1 = sp.X,
+                Y1 = sp.Y,
+                X2 = sp.X,
+                Y2 = sp.Y,
+                Stroke = new SolidColorBrush(AppSettings.ConnectionColor),
+                StrokeThickness = 2,
+                StrokeDashArray = new DoubleCollection { 4, 2 }
+            };
+            mainCanvas.Children.Add(_tempLine);
+            SetStatus("Кликните по другой ноде для соединения...");
+        }
+
+        private void DrawArrow(ConnectionModel conn)
+        {
+            var fromCtrl = _nodes.FirstOrDefault(n => n.Model.Id == conn.FromNodeId);
+            var toCtrl = _nodes.FirstOrDefault(n => n.Model.Id == conn.ToNodeId);
+            if (fromCtrl == null || toCtrl == null) return;
+
+            fromCtrl.UpdateLayout();
+            toCtrl.UpdateLayout();
+
+            Point from = conn.FromPort == "left"
+                ? fromCtrl.GetLeftPortCenter()
+                : fromCtrl.GetRightPortCenter();
+
+            Point to = conn.ToPort == "left"
+                ? toCtrl.GetLeftPortCenter()
+                : toCtrl.GetRightPortCenter();
+
+            var arrow = new ConnectionArrow();
+            arrow.Update(from, to);
+            arrow.Tag = conn;
+
+            arrow.MouseRightButtonUp += (_, e) =>
+            {
+                mainCanvas.Children.Remove(arrow);
+                _arrows.Remove(arrow);
+                _connections.Remove(conn);
+                fromCtrl.Model.ConnectedTo.Remove(conn.ToNodeId);
+                SetStatus("Связь удалена (ПКМ по линии).");
+                e.Handled = true;
+            };
+
+            mainCanvas.Children.Insert(0, arrow);
+            _arrows.Add(arrow);
+        }
+
+        private void RemoveConnection(ConnectionModel conn)
+        {
+            int idx = _connections.IndexOf(conn);
+            if (idx >= 0 && idx < _arrows.Count)
+            {
+                mainCanvas.Children.Remove(_arrows[idx]);
+                _arrows.RemoveAt(idx);
+            }
+            _connections.Remove(conn);
+
+            var src = _nodes.FirstOrDefault(n => n.Model.Id == conn.FromNodeId);
+            var tgt = _nodes.FirstOrDefault(n => n.Model.Id == conn.ToNodeId);
+            src?.Model.ConnectedTo.Remove(conn.ToNodeId);
+            tgt?.Model.ConnectedTo.Remove(conn.FromNodeId);
+        }
+
+        private void RemoveAllConnections(NodeControl ctrl)
+        {
+            var toRemove = _connections
+                .Where(c => c.FromNodeId == ctrl.Model.Id || c.ToNodeId == ctrl.Model.Id)
+                .ToList();
+            foreach (var c in toRemove) RemoveConnection(c);
+            SetStatus($"Все связи ноды «{ctrl.Model.Name}» удалены.");
+        }
+
+        private void RedrawArrows()
+        {
+            // Удалить старые стрелки
+            foreach (var a in _arrows)
+                mainCanvas.Children.Remove(a);
+            _arrows.Clear();
+
+            // Перерисовать
+            foreach (var conn in _connections)
+                DrawArrow(conn);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // ИНФО-ПАНЕЛЬ
+        // ═══════════════════════════════════════════════════════════════
+        private void ShowInfoPanelForCreate(NodeModel model)
+        {
+            infoPanel.LoadForCreate(model);
+            AnimateInfoPanel(show: true, large: false);
+        }
+
+        private void ShowInfoPanelForEdit(NodeModel model)
+        {
+            infoPanel.LoadForEdit(model);
+            AnimateInfoPanel(show: true, large: false);
+        }
+
+        private void ShowInfoPanelForView(NodeModel model)
+        {
+            infoPanel.LoadForView(model, _nodes.Select(n => n.Model));
+            AnimateInfoPanel(show: true, large: true);
+        }
+
+        private void HideInfoPanel()
+        {
+            AnimateInfoPanel(show: false, large: _infoPanelIsLarge);
+            _infoPanelVisible = false;
+        }
+
+        private void AnimateInfoPanel(bool show, bool large)
+        {
+            _infoPanelIsLarge = large;
+
+            // Высота
+            infoPanel.VerticalAlignment = VerticalAlignment.Top;
+
+            double shownMargin = 0;
+            double hiddenMargin = -infoPanel.Width - 2;
+
+            double targetMargin = show ? shownMargin : hiddenMargin;
+            _infoPanelVisible = show;
+
+            var anim = new ThicknessAnimation
+            {
+                To = new Thickness(targetMargin, 0, 0, 0),
+                Duration = TimeSpan.FromMilliseconds(AppSettings.InfoPanelAnimationMs),
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }
+            };
+            infoPanel.BeginAnimation(MarginProperty, anim);
+        }
+
+        private void InfoPanel_SaveRequested(NodeModel model)
+        {
+            // Проверить, есть ли уже нода с таким Id
+            var existing = _nodes.FirstOrDefault(n => n.Model.Id == model.Id);
+            if (existing == null)
+            {
+                // Новая нода
+                AddNodeControl(model);
+            }
+            else
+            {
+                // Обновить существующую
+                existing.Refresh();
+                RedrawArrows();
+                SetStatus($"Нода «{model.Name}» обновлена.");
+            }
+            HideInfoPanel();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // ВЫДЕЛЕНИЕ НОД
+        // ═══════════════════════════════════════════════════════════════
+        private void SelectNode(NodeControl ctrl)
+        {
+            DeselectAll();
+            _selectedNode = ctrl;
+            ctrl.SetSelected(true);
+            Panel.SetZIndex(ctrl, 100);
+        }
+
+        private void DeselectAll()
+        {
+            if (_selectedNode != null)
+            {
+                _selectedNode.SetSelected(false);
+                Panel.SetZIndex(_selectedNode, 1);
+                _selectedNode = null;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // НАВИГАЦИЯ ПО КАРТЕ
+        // ═══════════════════════════════════════════════════════════════
+        private (double cx, double cy) GetCanvasCenter()
+        {
+            return (canvasBorder.ActualWidth / 2, canvasBorder.ActualHeight / 2);
+        }
+
+        private void FocusNode(NodeControl ctrl)
+        {
+            var (cx, cy) = GetCanvasCenter();
+            _offsetX = cx - ctrl.Model.X * _scale - (ctrl.Model.Width * _scale / 2);
+            _offsetY = cy - ctrl.Model.Y * _scale - (ctrl.Model.Height * _scale / 2);
+            ApplyTransform();
+            SelectNode(ctrl);
+            SetStatus($"Переход к ноде «{ctrl.Model.Name}».");
+        }
+
+        private void ResetView()
+        {
+            _scale = 1.0;
+            _offsetX = 0;
+            _offsetY = 0;
+            ApplyTransform();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // БУФЕР ОБМЕНА
+        // ═══════════════════════════════════════════════════════════════
+        private NodeModel? _clipboard;
+
+        // ═══════════════════════════════════════════════════════════════
+        // ГОРЯЧИЕ КЛАВИШИ
+        // ═══════════════════════════════════════════════════════════════
+        private void MainWindow_KeyDown(object s, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape && _connectSource != null)
+            {
+                _connectSource = null;
+                ClearTempLine();
+                SetStatus("Соединение отменено.");
+                e.Handled = true;
+            }
+        }
+
+        private void ZoomAt(double delta)
+        {
+            _scale = Math.Clamp(_scale + delta, AppSettings.ZoomMin, AppSettings.ZoomMax);
+            ApplyTransform();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // СОХРАНЕНИЕ / ЗАГРУЗКА
+        // ═══════════════════════════════════════════════════════════════
+        private void BtnSave_Click(object s, RoutedEventArgs e)
+        {
+            if (_currentFilePath != null)
+                SaveToPath(_currentFilePath);   // перезапись
+            else
+                SaveAs();
+        }
+
+        private void BtnSaveAs_Click(object s, RoutedEventArgs e) => SaveAs();
+
+        private void SaveAs()
+        {
+            var dlg = new SaveFileDialog
+            {
+                Title = "Сохранить карту",
+                Filter = "Карта узлов|*.gnmap|Все файлы|*.*",
+                DefaultExt = ".gnmap"
+            };
+            if (dlg.ShowDialog() != true) return;
+            SaveToPath(dlg.FileName);
+        }
+
+        private void SaveToPath(string path)
+        {
+            var map = new MapData
+            {
+                Nodes = _nodes.Select(n => n.Model).ToList(),
+                Connections = _connections
+            };
+            var json = System.Text.Json.JsonSerializer.Serialize(map,
+                new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            System.IO.File.WriteAllText(path, json);
+            _currentFilePath = path;
+            UpdateTitleBar();
+            SetStatus($"Сохранено: {System.IO.Path.GetFileName(path)}");
+        }
+
+        private void BtnOpen_Click(object s, RoutedEventArgs e)
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title = "Открыть карту",
+                Filter = "Карта узлов|*.gnmap|Все файлы|*.*"
+            };
+            if (dlg.ShowDialog() == true)
+                OpenMapFromPath(dlg.FileName);
+        }
+
+        private void OpenMapFromPath(string path)
+        {
+            try
+            {
+                var json = System.IO.File.ReadAllText(path);
+                var map = System.Text.Json.JsonSerializer.Deserialize<MapData>(json);
+                if (map == null) return;
+
+                ClearAll();
+
+                foreach (var model in map.Nodes)
+                    AddNodeControl(model);
+
+                _connections.AddRange(map.Connections);
+
+                // Ждём отрисовки нод перед стрелками
+                Dispatcher.InvokeAsync(() =>
+                {
+                    foreach (var conn in _connections)
+                        DrawArrow(conn);
+                }, System.Windows.Threading.DispatcherPriority.Loaded);
+
+                _currentFilePath = path;
+                UpdateTitleBar();
+                SetStatus($"Открыт файл: {System.IO.Path.GetFileName(path)}");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка открытия:\n{ex.Message}", "Ошибка",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        // ── Заголовок окна ────────────────────────────────────────────
+        private void UpdateTitleBar()
+        {
+            Title = _currentFilePath != null
+                ? $"Interactive Whiteboard — {System.IO.Path.GetFileName(_currentFilePath)}"
+                : "Interactive Whiteboard";
+        }
+
+        private void BtnClearAll_Click(object s, RoutedEventArgs e)
+        {
+            var r = MessageBox.Show(
+                "Очистить всю карту? Несохранённые данные будут потеряны.",
+                "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (r == MessageBoxResult.Yes) ClearAll();
+        }
+
+        // ── ПОИСК НОДЫ ────────────----────────────────────────────────
+        private void BtnFindNode_Click(object s, RoutedEventArgs e)
+        {
+            var win = new Window
+            {
+                Title = "Найти ноду",
+                Width = 360,
+                Height = 180,
+                Background = new SolidColorBrush(Color.FromRgb(32, 35, 43)),
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ResizeMode = ResizeMode.NoResize
+            };
+            var sp = new StackPanel { Margin = new Thickness(16) };
+            var lbl = new TextBlock
+            {
+                Text = "Введите имя ноды:",
+                Foreground = Brushes.LightGray,
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+            var tb = new TextBox
+            {
+                Background = new SolidColorBrush(Color.FromRgb(28, 30, 36)),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(60, 130, 200)),
+                Padding = new Thickness(6, 4, 6, 4)
+            };
+            var btn = new Button
+            {
+                Content = "Найти",
+                Margin = new Thickness(0, 8, 0, 0),
+                Background = new SolidColorBrush(Color.FromRgb(60, 130, 200)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(12, 6, 12, 6)
+            };
+            btn.Click += (_, _) =>
+            {
+                var q = tb.Text.Trim().ToLower();
+                var ctrl = _nodes.FirstOrDefault(n => n.Model.Name.ToLower().Contains(q));
+                if (ctrl != null) { FocusNode(ctrl); win.Close(); }
+                else SetStatus($"Нода «{tb.Text}» не найдена.");
+            };
+            tb.KeyDown += (_, e2) => { if (e2.Key == Key.Enter) btn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); };
+            sp.Children.Add(lbl);
+            sp.Children.Add(tb);
+            sp.Children.Add(btn);
+            win.Content = sp;
+            win.ShowDialog();
+            tb.Focus();
+        }
+
+        private void ClearMap()
+        {
+            _nodes.ForEach(n => mainCanvas.Children.Remove(n));
+            _arrows.ForEach(a => mainCanvas.Children.Remove(a));
+            _nodes.Clear();
+            _arrows.Clear();
+            _connections.Clear();
+        }
+
+        private void ClearAll()
+        {
+            ClearMap();
+            _selectedNode = null;
+            _connectSource = null;
+            HideInfoPanel();
+            SetStatus("Карта очищена.");
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // ЗУМИРОВАНИЕ (кнопки)
+        // ═══════════════════════════════════════════════════════════════
+        private void BtnZoomIn_Click(object s, RoutedEventArgs e) => ZoomAt(AppSettings.ZoomStep);
+        private void BtnZoomOut_Click(object s, RoutedEventArgs e) => ZoomAt(-AppSettings.ZoomStep);
+        private void BtnResetView_Click(object s, RoutedEventArgs e) => ResetView();
+
+        // ═══════════════════════════════════════════════════════════════
+        // СТАТУС-БАР
+        // ═══════════════════════════════════════════════════════════════
+        private void SetStatus(string msg) => tbStatus.Text = msg;
+
+        private void NodeCtrl_NodeMoved(NodeControl ctrl)
+        {
+            var related = _connections
+                .Where(c => c.FromNodeId == ctrl.Model.Id || c.ToNodeId == ctrl.Model.Id)
+                .ToList();
+
+            foreach (var conn in related)
+            {
+                var arrow = _arrows.FirstOrDefault(a => a.Tag is ConnectionModel cm && cm == conn);
+                if (arrow == null) continue;
+
+                var fromCtrl = _nodes.FirstOrDefault(n => n.Model.Id == conn.FromNodeId);
+                var toCtrl = _nodes.FirstOrDefault(n => n.Model.Id == conn.ToNodeId);
+                if (fromCtrl == null || toCtrl == null) continue;
+
+                Point from = conn.FromPort == "left"
+                    ? fromCtrl.GetLeftPortCenter()
+                    : fromCtrl.GetRightPortCenter();
+
+                Point to = conn.ToPort == "left"
+                    ? toCtrl.GetLeftPortCenter()
+                    : toCtrl.GetRightPortCenter();
+
+                arrow.Update(from, to);
+            }
+        }
+
+        // ── Начало соединения (правый порт) ──────────────────────────
+        private void NodeCtrl_RequestConnectFrom(NodeControl ctrl) => 
+            StartConnecting(ctrl, fromLeft: false);
+
+        // ── Начало соединения (левый порт) ───────────────────────────
+        private void NodeCtrl_RequestConnectFromLeft(NodeControl ctrl) => 
+            StartConnecting(ctrl, fromLeft: true);
+
+        private void StartConnecting(NodeControl ctrl, bool fromLeft)
+        {
+            if (_connectSource == null)
+            {
+                _connectSource = ctrl;
+                _connectFromLeft = fromLeft;
+                var portCenter = fromLeft ? ctrl.GetLeftPortCenter() : ctrl.GetRightPortCenter();
+                StartTempLine(portCenter);
+                SetStatus($"Выбрана нода «{ctrl.Model.Name}». Кликните на порт другой ноды.");
+            }
+            else
+            {
+                CompleteConnection(ctrl, toLeft: fromLeft);
+            }
+        }
+
+        // ── Временная линия ───────────────────────────────────────────
+        private void StartTempLine(Point from)
+        {
+            ClearTempLine();
+            _tempLine = new System.Windows.Shapes.Line
+            {
+                Stroke = new SolidColorBrush(AppSettings.ConnectionSelectedColor),
+                StrokeThickness = 2,
+                StrokeDashArray = new DoubleCollection { 5, 3 },
+                X1 = from.X,
+                Y1 = from.Y,
+                X2 = from.X,
+                Y2 = from.Y,
+                IsHitTestVisible = false // Линия не перехватывает клики
+            };
+            mainCanvas.Children.Add(_tempLine);
+        }
+
+        private void ClearTempLine()
+        {
+            if (_tempLine != null)
+            {
+                mainCanvas.Children.Remove(_tempLine);
+                _tempLine = null;
+            }
+        }
+
+        // ── Завершить соединение ──────────────────────────────────────
+        private void CompleteConnection(NodeControl target, bool toLeft)
+        {
+            if (_connectSource == null) return;
+
+            // Нельзя соединить с собой
+            if (_connectSource.Model.Id == target.Model.Id)
+            {
+                SetStatus("Нельзя соединить ноду саму с собой.");
+                CancelConnection();
+                return;
+            }
+
+            // Дубликат
+            if (_connections.Any(c =>
+                c.FromNodeId == _connectSource.Model.Id &&
+                c.ToNodeId == target.Model.Id))
+            {
+                SetStatus("Такая связь уже существует.");
+                CancelConnection();
+                return;
+            }
+
+            var conn = new ConnectionModel
+            {
+                FromNodeId = _connectSource.Model.Id,
+                ToNodeId = target.Model.Id,
+                FromPort = _connectFromLeft ? "left" : "right",
+                ToPort = toLeft ? "left" : "right"
+            };
+
+            _connections.Add(conn);
+
+            if (!_connectSource.Model.ConnectedTo.Contains(target.Model.Id))
+                _connectSource.Model.ConnectedTo.Add(target.Model.Id);
+
+            string fromName = _connectSource.Model.Name;
+            string toName = target.Model.Name;
+
+            CancelConnection();
+            DrawArrow(conn);
+            SetStatus($"Связь создана: «{fromName}» → «{toName}».");
+        }
+
+        private void CancelConnection()
+        {
+            _connectSource = null;
+            ClearTempLine();
+        }
+
+        private void CanvasBorder_MouseLeftButtonDown(object s, MouseButtonEventArgs e)
+        {
+            // Не отменяем соединение по ЛКМ — только панорамирование
+            // Соединение отменяется только через ПКМ или Escape
+
+            _isPanning = true;
+            _panStart = e.GetPosition(canvasBorder);
+            canvasBorder.CaptureMouse();
+            Cursor = Cursors.SizeAll;
+            e.Handled = true;
+        }
+
+        private void CanvasBorder_MouseMove(object s, MouseEventArgs e)
+        {
+            if (_isPanning && e.LeftButton == MouseButtonState.Pressed)
+            {
+                var cur = e.GetPosition(canvasBorder);
+                _offsetX += cur.X - _panStart.X;
+                _offsetY += cur.Y - _panStart.Y;
+                _panStart = cur;
+
+                scaleT.ScaleX = _scale;
+                scaleT.ScaleY = _scale;
+                translateT.X = _offsetX;
+                translateT.Y = _offsetY;
+                tbZoom.Text = $"{_scale * 100:F0}%";
+                RedrawGrid();
+                return;
+            }
+
+            // Двигать временную линию соединения
+            if (_tempLine != null && _connectSource != null)
+            {
+                var pos = e.GetPosition(mainCanvas);
+                _tempLine.X2 = pos.X;
+                _tempLine.Y2 = pos.Y; 
+                _tempLine.X2 = pos.X;
+                _tempLine.Y2 = pos.Y;
+            }
+        }
+
+        private void CanvasBorder_MouseLeftButtonUp(object s, MouseButtonEventArgs e)
+        {
+            if (_isPanning)
+            {
+                _isPanning = false;
+                canvasBorder.ReleaseMouseCapture();
+                Cursor = Cursors.Arrow;
+                RedrawArrows();
+                e.Handled = true;
+            }
+        }
+
+        private void CanvasBorder_MouseRightButtonUp(object s, MouseButtonEventArgs e)
+        {
+            // ПКМ отменяет соединение
+            if (_connectSource != null)
+            {
+                _connectSource = null;
+                ClearTempLine();
+                SetStatus("Соединение отменено.");
+                e.Handled = true;
+                return;
+            }
+
+            ShowCreateNodeMenu(e);
+            e.Handled = true;
+        }
+
+        private void ShowCreateNodeMenu(MouseButtonEventArgs e)
+        {
+            var screenPos = e.GetPosition(canvasBorder);
+            var canvasPos = ScreenToCanvas(screenPos);
+
+            var cm = new ContextMenu();
+            var mi = new MenuItem { Header = "➕ Создать ноду" };
+            mi.Click += (_, _) =>
+            {
+                var model = new NodeModel
+                {
+                    X = canvasPos.X,
+                    Y = canvasPos.Y,
+                    Name = "Новая нода",
+                    BackgroundColorHex = $"#{AppSettings.NodeDefaultBackground.R:X2}{AppSettings.NodeDefaultBackground.G:X2}{AppSettings.NodeDefaultBackground.B:X2}",
+                    HeaderColorHex = $"#{AppSettings.NodeHeaderBackground.R:X2}{AppSettings.NodeHeaderBackground.G:X2}{AppSettings.NodeHeaderBackground.B:X2}",
+                    TextColorHex = $"#{AppSettings.NodeDefaultText.R:X2}{AppSettings.NodeDefaultText.G:X2}{AppSettings.NodeDefaultText.B:X2}",
+                    FontFamily = AppSettings.NodeDefaultFontFamily,
+                    FontSize = AppSettings.NodeDefaultFontSize,
+                    Width = AppSettings.NodeDefaultWidth,
+                    Height = AppSettings.NodeDefaultHeight,
+                };
+                ShowInfoPanelForCreate(model);
+            };
+            cm.Items.Add(mi);
+            cm.IsOpen = true;
+        }
+    }
+}

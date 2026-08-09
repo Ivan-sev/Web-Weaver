@@ -1,0 +1,211 @@
+﻿<UserControl x:Class="WebWeaver.Controls.InfoPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="380" Background="#20232B"
+             BorderBrush="#3C82C8" BorderThickness="0,0,1,0">
+
+    <UserControl.Resources>
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="BorderBrush" Value="#3C82C8"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,4"/>
+        </Style>
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="#2A2D36"/>
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Style.Triggers>
+                <Trigger Property="IsHighlighted" Value="True">
+                    <Setter Property="Background" Value="#3C82C8"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    
+    
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="44"/>
+            <RowDefinition Height="16*"/>
+            <RowDefinition Height="453*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Заголовок -->
+        <Border Grid.Row="0" Background="#1C1E24"
+                BorderBrush="#3C82C8" BorderThickness="0,0,0,1">
+            <Grid Margin="12,0">
+                <TextBlock x:Name="tbPanelTitle" Foreground="White" FontSize="14"
+                           FontWeight="SemiBold" VerticalAlignment="Center"/>
+                <Button x:Name="btnClose" Content="✕" HorizontalAlignment="Right"
+                        VerticalAlignment="Center" Width="28" Height="28"
+                        Background="Transparent" Foreground="#AAAAAA"
+                        BorderThickness="0" FontSize="14" Cursor="Hand"
+                        Click="BtnClose_Click"/>
+            </Grid>
+        </Border>
+
+        <!-- Содержимое: две вкладки — редактор (1/3) и блокнот (3/4) -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,0,0,54" Grid.RowSpan="3">
+            <StackPanel x:Name="spEditor" Margin="14,10,14,0">
+
+                <!-- Имя -->
+                <TextBlock Text="Имя ноды" Foreground="#CCCCCC" FontSize="11" Margin="0,0,0,3"/>
+                <TextBox x:Name="txName" Style="{StaticResource FieldBox}" Margin="0,0,0,10"/>
+
+                <!-- РЕЖИМ ПРОСМОТРА/БЛОКНОТА — видно только в режиме 3/4 -->
+                <StackPanel x:Name="spViewMode" Visibility="Collapsed">
+                    <!-- Связанные ноды -->
+                    <TextBlock Text="Связанные ноды" Foreground="#CCCCCC" FontSize="11" Margin="0,0,0,3"/>
+                    <ItemsControl x:Name="icLinks" Margin="0,0,0,10">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Content="{Binding DisplayName}"
+                                        Tag="{Binding NodeId}"
+                                        HorizontalAlignment="Left"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Foreground="#5AB3FF"
+                                        FontSize="12"
+                                        Cursor="Hand"
+                                        Margin="0,2"
+                                        Click="LinkBtn_Click"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Текст как блокнот -->
+                    <TextBlock Text="Текст ноды" Foreground="#CCCCCC" FontSize="11" Margin="0,0,0,3"/>
+                    <TextBlock Foreground="#888888" FontSize="10" Margin="0,0,0,4"
+                               TextWrapping="Wrap"
+                               Text="Ссылка на ноду: [имя ноды]  •  Интернет: https://..."/>
+                    <TextBox x:Name="txText"
+                             MinHeight="180"
+                             AcceptsReturn="True" AcceptsTab="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             Style="{StaticResource FieldBox}"
+                             FontFamily="Consolas" FontSize="13"
+                             Margin="0,0,0,8"/>
+
+                    <!-- Рендер текста с кликабельными ссылками -->
+                    <TextBlock Text="Предпросмотр:" Foreground="#CCCCCC" FontSize="11" Margin="0,4,0,3"/>
+                    <RichTextBox x:Name="rtbPreview"
+                                 IsReadOnly="True"
+                                 Background="#1C1E24"
+                                 Foreground="White"
+                                 BorderBrush="#3C82C8"
+                                 BorderThickness="1"
+                                 Padding="8"
+                                 MinHeight="80"
+                                 Margin="0,0,0,10"
+                                 FontSize="13"/>
+                </StackPanel>
+
+                <!-- РЕЖИМ РЕДАКТОРА — только в 1/3 -->
+                <StackPanel x:Name="spEditMode">
+
+                    <!-- Текст ноды (краткий) -->
+                    <TextBlock Text="Текст ноды" Foreground="#CCCCCC" FontSize="11" Margin="0,0,0,3"/>
+                    <TextBox x:Name="txTextShort"
+                             MinHeight="60" AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             Style="{StaticResource FieldBox}" Margin="0,0,0,10"/>
+
+                    <!-- Цвета -->
+                    <TextBlock Text="Цвет фона" Foreground="#CCCCCC" FontSize="11" Margin="0,0,0,3"/>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="36"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="txBgColor" Style="{StaticResource FieldBox}"
+                                 Grid.Column="0" TextChanged="ColorBox_Changed"/>
+                        <Border x:Name="prevBg" Grid.Column="1"
+                                Margin="4,0,0,0" CornerRadius="4"
+                                BorderBrush="#555" BorderThickness="1"
+                                Cursor="Hand" MouseLeftButtonDown="PrevBg_MouseLeftButtonDown"/>
+                    </Grid>
+
+                    <TextBlock Text="Цвет заголовка" Foreground="#CCCCCC" FontSize="11" Margin="0,0,0,3"/>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="36"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="txHeaderColor" Style="{StaticResource FieldBox}"
+                                 Grid.Column="0" TextChanged="ColorBox_Changed"/>
+                        <Border x:Name="prevHeader" Grid.Column="1"
+                                Margin="4,0,0,0" CornerRadius="4"
+                                BorderBrush="#555" BorderThickness="1"
+                                Cursor="Hand" MouseLeftButtonDown="PrevHeader_MouseLeftButtonDown"/>
+                    </Grid>
+
+                    <TextBlock Text="Цвет текста" Foreground="#CCCCCC" FontSize="11" Margin="0,0,0,3"/>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="36"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="txTextColor" Style="{StaticResource FieldBox}"
+                                 Grid.Column="0" TextChanged="ColorBox_Changed"/>
+                        <Border x:Name="prevText" Grid.Column="1"
+                                Margin="4,0,0,0" CornerRadius="4"
+                                BorderBrush="#555" BorderThickness="1"
+                                Cursor="Hand" MouseLeftButtonDown="PrevText_MouseLeftButtonDown"/>
+                    </Grid>
+
+                    <!-- Шрифт -->
+                    <TextBlock Text="Шрифт" Foreground="#CCCCCC" FontSize="11" Margin="0,0,0,3"/>
+                    <ComboBox x:Name="cbFont" Margin="0,0,0,10"
+                              Background="#1C1E24"
+                              Foreground="Black"
+                              BorderBrush="#3C82C8"
+                              BorderThickness="1" SelectionChanged="cbFont_SelectionChanged"/>
+                    
+                    
+
+                    <!-- Размер шрифта -->
+                    <TextBlock Text="Размер шрифта" Foreground="#CCCCCC" FontSize="11" Margin="0,0,0,3"/>
+                    <TextBox x:Name="txFontSize" Style="{StaticResource FieldBox}" Margin="0,0,0,10"/>
+
+                    <!-- Картинка -->
+                    <TextBlock Text="Картинка (путь к файлу)" Foreground="#CCCCCC" FontSize="11" Margin="0,0,0,3"/>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="txImagePath" Style="{StaticResource FieldBox}" Grid.Column="0"/>
+                        <Button Content="📂" Grid.Column="1"
+                                Margin="4,0,0,0" Padding="8,4"
+                                Background="#3C82C8" Foreground="White"
+                                BorderThickness="0"
+                                Click="BtnPickImage_Click"/>
+                    </Grid>
+                </StackPanel>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Кнопки -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,8,14,14">
+            <Button x:Name="btnCancel" Content="Отмена"
+                    Width="80" Height="32"
+                    Background="#444" Foreground="White"
+                    BorderThickness="0" Margin="0,0,8,0"
+                    Click="BtnCancel_Click"/>
+            <Button x:Name="btnSave" Content="💾 Сохранить"
+                    Height="32" Padding="14,0"
+                    Background="#3C82C8" Foreground="White"
+                    BorderThickness="0" FontWeight="SemiBold"
+                    Click="BtnSave_Click"/>
+        </StackPanel>
+    </Grid>
+</UserControl>
