@@ -42,6 +42,9 @@ namespace WebWeaver.Models
         }
 
         private static string ToHex(Color c) => $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+        
+        // Внутренняя карта: если не null — нода является картой-узлом
+        public MapData? EmbeddedMap { get; set; }
 
         public NodeModel Clone() => new NodeModel
         {
