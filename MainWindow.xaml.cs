@@ -1275,7 +1275,7 @@ namespace WebWeaver
                 Foreground = Brushes.White,
                 BorderThickness = new Thickness(0)
             };
-            btnUp.Click += (_, _) => { ExitMap(); win.Close(); };
+            btnUp.Click += (_, _) => { ExitMap(); /*win.Close();*/ };
 
             var btnRoot = new Button
             {
