@@ -37,6 +37,12 @@
                         Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
                         Click="BtnNewNode_Click" ToolTip="Создать новую ноду (Insert)"/>
 
+                <Button x:Name="BtnTree" DockPanel.Dock="Left" Content="🌳 Дерево"
+                    Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
+                    Click="BtnTree_Click" ToolTip="Дерево нод: кто к кому принадлежит"/>
+
+                <Separator DockPanel.Dock="Left" Background="#2A2D38" Width="1" Margin="4,4"/>
+                
                 <Button DockPanel.Dock="Left" Content="💾 Сохранить"
                         Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
                         Click="BtnSave_Click" ToolTip="Сохранить карту (Ctrl+S)"/>
@@ -45,6 +51,8 @@
                         Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
                         Click="BtnOpen_Click" ToolTip="Открыть карту (Ctrl+O)"/>
 
+                <Separator DockPanel.Dock="Left" Background="#2A2D38" Width="1" Margin="4,4"/>
+                
                 <Button DockPanel.Dock="Left" Content="🗑 Очистить всё"
                         Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
                         Click="BtnClearAll_Click" ToolTip="Очистить всё (Ctrl+Del)"/>
