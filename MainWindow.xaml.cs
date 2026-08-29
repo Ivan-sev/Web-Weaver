@@ -65,6 +65,9 @@ namespace WebWeaver
                 var ctrl = _nodes.FirstOrDefault(n => n.Model.Id == id);
                 if (ctrl != null) FocusNode(ctrl);
             };
+
+            // Карты-узлы: начальный уровень + верхняя панель навигации
+            _mapStack.Add(new MapLevel { Map = new MapData(), Title = "Корень" });
         }
 
         private void MainWindow_Loaded(object s, RoutedEventArgs e)
@@ -251,7 +254,13 @@ namespace WebWeaver
         {
             if (e.ClickCount == 2)
             {
-                HideInfoPanel();
+                // Прячем панель только при двойном клике по пустому месту.
+                // Клик по ноде не трогаем — иначе панель закроется сразу после открытия.
+                if (!IsInsideNode(e.OriginalSource as DependencyObject))
+                {
+                    DeselectAll();
+                    HideInfoPanel();
+                }
                 return;
             }
             // Начать панорамирование средней кнопкой или Alt+ЛКМ
@@ -264,6 +273,18 @@ namespace WebWeaver
                 return;
             }
             DeselectAll();
+        }
+
+        private static bool IsInsideNode(DependencyObject? d)
+        {
+            while (d != null)
+            {
+                if (d is NodeControl) return true;
+                d = d is Visual || d is System.Windows.Media.Media3D.Visual3D
+                    ? VisualTreeHelper.GetParent(d)
+                    : LogicalTreeHelper.GetParent(d);
+            }
+            return false;
         }
 
         private void MainCanvas_MouseLeftButtonUp(object s, MouseButtonEventArgs e)
@@ -307,33 +328,35 @@ namespace WebWeaver
         private void MainCanvas_MouseRightButtonUp(object s, MouseButtonEventArgs e)
         {
             if (_connectSource != null) { CancelConnection(); return; }
-
-            var screenPos = e.GetPosition(canvasBorder);
-            var canvasPos = ScreenToCanvas(screenPos);
-
-            var cm = new ContextMenu();
-            var mi = new MenuItem { Header = "➕ Создать ноду" };
-            mi.Click += (_, _) =>
-            {
-            var model = new NodeModel
-            {
-                X = canvasPos.X,
-                Y = canvasPos.Y,
-                Name = "Новая нода",
-                BackgroundColorHex = $"#{AppSettings.NodeDefaultBackground.R:X2}{AppSettings.NodeDefaultBackground.G:X2}{AppSettings.NodeDefaultBackground.B:X2}",
-                HeaderColorHex = $"#{AppSettings.NodeHeaderBackground.R:X2}{AppSettings.NodeHeaderBackground.G:X2}{AppSettings.NodeHeaderBackground.B:X2}",
-                TextColorHex = $"#{AppSettings.NodeDefaultText.R:X2}{AppSettings.NodeDefaultText.G:X2}{AppSettings.NodeDefaultText.B:X2}",
-                FontFamily = AppSettings.NodeDefaultFontFamily,
-                FontSize = AppSettings.NodeDefaultFontSize,
-
-                Width = AppSettings.NodeDefaultWidth,
-                Height = AppSettings.NodeDefaultHeight,
-            };
-            ShowInfoPanelForCreate(model);
-            };
-            cm.Items.Add(mi);
-            cm.IsOpen = true;
+            ShowCreateNodeMenu(e);
             e.Handled = true;
+
+            //var screenPos = e.GetPosition(canvasBorder);
+            //var canvasPos = ScreenToCanvas(screenPos);
+
+            //var cm = new ContextMenu();
+            //var mi = new MenuItem { Header = "➕ Создать ноду" };
+            //mi.Click += (_, _) =>
+            //{
+            //var model = new NodeModel
+            //{
+            //    X = canvasPos.X,
+            //    Y = canvasPos.Y,
+            //    Name = "Новая нода",
+            //    BackgroundColorHex = $"#{AppSettings.NodeDefaultBackground.R:X2}{AppSettings.NodeDefaultBackground.G:X2}{AppSettings.NodeDefaultBackground.B:X2}",
+            //    HeaderColorHex = $"#{AppSettings.NodeHeaderBackground.R:X2}{AppSettings.NodeHeaderBackground.G:X2}{AppSettings.NodeHeaderBackground.B:X2}",
+            //    TextColorHex = $"#{AppSettings.NodeDefaultText.R:X2}{AppSettings.NodeDefaultText.G:X2}{AppSettings.NodeDefaultText.B:X2}",
+            //    FontFamily = AppSettings.NodeDefaultFontFamily,
+            //    FontSize = AppSettings.NodeDefaultFontSize,
+
+            //    Width = AppSettings.NodeDefaultWidth,
+            //    Height = AppSettings.NodeDefaultHeight,
+            //};
+            //ShowInfoPanelForCreate(model);
+            //};
+            //cm.Items.Add(mi);
+            //cm.IsOpen = true;
+            //e.Handled = true;
         }
 
         private Point ScreenToCanvas(Point screenPoint)
@@ -378,9 +401,15 @@ namespace WebWeaver
             ctrl.Resized += (c, _) => NodeCtrl_NodeMoved(c);
             ctrl.RequestConnectFrom += NodeCtrl_RequestConnectFrom;
             ctrl.RequestConnectFromLeft += NodeCtrl_RequestConnectFromLeft;
-            ctrl.DoubleClicked += c => ShowInfoPanelForView(c.Model);
-            
+            //ctrl.DoubleClicked += c => ShowInfoPanelForView(c.Model);
             ctrl.RightClicked += (c, _) => ShowNodeContextMenu(c);
+            ctrl.DoubleClicked += c =>
+            {
+                if (c.Model.EmbeddedMap != null)
+                    EnterMap(c);                      // карта-узел → открываем вложенную карту
+                else
+                    ShowInfoPanelForView(c.Model);    // обычная нода → блокнот
+            };
 
             Canvas.SetLeft(ctrl, model.X);
             Canvas.SetTop(ctrl, model.Y);
@@ -393,13 +422,37 @@ namespace WebWeaver
             SelectNode(ctrl);
             var cm = new ContextMenu();
 
+            if (ctrl.Model.EmbeddedMap != null)
+            {
+                var miOpenMap = new MenuItem { Header = "🗺 Открыть карту ноды" };
+                miOpenMap.Click += (_, _) => EnterMap(ctrl);
+                cm.Items.Add(miOpenMap);
+            }
+            else
+            {
+                var miMakeMap = new MenuItem { Header = "🗺 Сделать картой-узлом" };
+                miMakeMap.Click += (_, _) =>
+                {
+                    ctrl.Model.EmbeddedMap = new MapData();
+                    EnterMap(ctrl);
+                };
+                cm.Items.Add(miMakeMap);
+            }
+
+            var miCompressBranch = new MenuItem { Header = "🗜 Сжать ветку в ноду" };
+            miCompressBranch.Click += (_, _) => CompressBranchIntoNode(ctrl);
+            cm.Items.Add(miCompressBranch);
+
             var miEdit = new MenuItem { Header = "✏️ Редактировать" };
             miEdit.Click += (_, _) => ShowInfoPanelForEdit(ctrl.Model);
             cm.Items.Add(miEdit);
 
-            var miView = new MenuItem { Header = "📖 Открыть блокнот" };
-            miView.Click += (_, _) => ShowInfoPanelForView(ctrl.Model);
-            cm.Items.Add(miView);
+            if (ctrl.Model.EmbeddedMap == null)
+            {
+                var miView = new MenuItem { Header = "📖 Открыть блокнот" };
+                miView.Click += (_, _) => ShowInfoPanelForView(ctrl.Model);
+                cm.Items.Add(miView);
+            }
 
             var miDup = new MenuItem { Header = "📋 Дублировать" };
             miDup.Click += (_, _) => DuplicateNode(ctrl);
@@ -449,6 +502,13 @@ namespace WebWeaver
 
         private void DuplicateNode(NodeControl ctrl)
         {
+            MapData? mapCopy = null;
+            if (ctrl.Model.EmbeddedMap != null)
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(ctrl.Model.EmbeddedMap);
+                mapCopy = System.Text.Json.JsonSerializer.Deserialize<MapData>(json);
+            }
+
             var m2 = new NodeModel
             {
                 Name = ctrl.Model.Name + " (копия)",
@@ -463,6 +523,7 @@ namespace WebWeaver
                 FontFamily = ctrl.Model.FontFamily,
                 FontSize = ctrl.Model.FontSize,
                 ImagePath = ctrl.Model.ImagePath,
+                EmbeddedMap = mapCopy
             };
             AddNodeControl(m2);
         }
@@ -745,8 +806,9 @@ namespace WebWeaver
             var dlg = new SaveFileDialog
             {
                 Title = "Сохранить карту",
-                Filter = "Карта узлов|*.gnmap|Все файлы|*.*",
-                DefaultExt = ".gnmap"
+                Filter = "Карта узлов (*.wwmap)|*.wwmap|Все файлы|*.*",
+                DefaultExt = ".wwmap",
+                AddExtension = true
             };
             if (dlg.ShowDialog() != true) return;
             SaveToPath(dlg.FileName);
@@ -754,14 +816,12 @@ namespace WebWeaver
 
         private void SaveToPath(string path)
         {
-            var map = new MapData
-            {
-                Nodes = _nodes.Select(n => n.Model).ToList(),
-                Connections = _connections
-            };
-            var json = System.Text.Json.JsonSerializer.Serialize(map,
+            GoToRoot();
+
+            var json = System.Text.Json.JsonSerializer.Serialize(CurrentLevel.Map,
                 new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
             System.IO.File.WriteAllText(path, json);
+
             _currentFilePath = path;
             UpdateTitleBar();
             SetStatus($"Сохранено: {System.IO.Path.GetFileName(path)}");
@@ -772,7 +832,7 @@ namespace WebWeaver
             var dlg = new OpenFileDialog
             {
                 Title = "Открыть карту",
-                Filter = "Карта узлов|*.gnmap|Все файлы|*.*"
+                Filter = "Карты узлов (*.wwmap;*.gnmap)|*.wwmap;*.gnmap|Все файлы|*.*"
             };
             if (dlg.ShowDialog() == true)
                 OpenMapFromPath(dlg.FileName);
@@ -784,29 +844,301 @@ namespace WebWeaver
             {
                 var json = System.IO.File.ReadAllText(path);
                 var map = System.Text.Json.JsonSerializer.Deserialize<MapData>(json);
-                if (map == null) return;
 
-                ClearAll();
+                if (map == null || map.Nodes.Count == 0)
+                {
+                    MessageBox.Show("Файл пуст или не является картой узлов.", "Ошибка",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
 
+                // 1. Сбрасываем стек уровней: загруженная карта становится корнем
+                _mapStack.Clear();
+                _mapStack.Add(new MapLevel { Map = map, Title = "Корень" });
+
+                // 2. Полностью очищаем полотно
+                ClearTempLine();
+                _connectSource = null;
+                DeselectAll();
+                HideInfoPanel();
+                ClearMap();
+
+                // 3. Загружаем ноды и связи
                 foreach (var model in map.Nodes)
                     AddNodeControl(model);
 
                 _connections.AddRange(map.Connections);
 
-                // Ждём отрисовки нод перед стрелками
+                // 4. Рисуем стрелки после того, как ноды получат реальные размеры
                 Dispatcher.InvokeAsync(() =>
                 {
-                    foreach (var conn in _connections)
+                    foreach (var conn in _connections.ToList())
                         DrawArrow(conn);
                 }, System.Windows.Threading.DispatcherPriority.Loaded);
 
+                // 5. Обновляем интерфейс
                 _currentFilePath = path;
                 UpdateTitleBar();
-                SetStatus($"Открыт файл: {System.IO.Path.GetFileName(path)}");
+                ResetView();
+
+                SetStatus($"Открыто: {System.IO.Path.GetFileName(path)} ({map.Nodes.Count} нод)");
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Ошибка открытия:\n{ex.Message}", "Ошибка",
+                MessageBox.Show($"Не удалось открыть карту:\n{ex.Message}", "Ошибка",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+
+        // ═══════════════════════════════════════════════════════════════
+        // КАРТЫ-УЗЛЫ: ВЛОЖЕННЫЕ КАРТЫ И НАВИГАЦИЯ
+        // ═══════════════════════════════════════════════════════════════
+        private sealed class MapLevel
+        {
+            public MapData Map = new();
+            public string Title = "Корень";
+        }
+
+        private readonly List<MapLevel> _mapStack = new();
+        private MapLevel CurrentLevel => _mapStack[_mapStack.Count - 1];
+
+        // ── Синхронизация полотна ↔ текущий уровень ────────────────────
+        private void SyncCurrentLevelFromCanvas()
+        {
+            var m = CurrentLevel.Map;
+            m.Nodes = _nodes.Select(n => n.Model).ToList();
+            m.Connections.Clear();
+            m.Connections.AddRange(_connections);
+        }
+
+        private void LoadCanvasFromLevel(MapLevel level)
+        {
+            ClearTempLine();
+            _connectSource = null;
+            DeselectAll();
+            ClearMap();
+
+            foreach (var model in level.Map.Nodes)
+                AddNodeControl(model);
+            _connections.AddRange(level.Map.Connections);
+
+            Dispatcher.InvokeAsync(() =>
+            {
+                foreach (var conn in _connections.ToList())
+                    DrawArrow(conn);
+            }, System.Windows.Threading.DispatcherPriority.Loaded);
+
+            ResetView();
+            HideInfoPanel();
+        }
+
+        // ── Перемещение по уровням ─────────────────────────────────────
+        private void NavigateToLevel(int index)
+        {
+            if (index < 0 || index >= _mapStack.Count) return;
+
+            SyncCurrentLevelFromCanvas();
+            if (index == _mapStack.Count - 1) return;
+
+            _mapStack.RemoveRange(index + 1, _mapStack.Count - index - 1);
+            LoadCanvasFromLevel(CurrentLevel);
+
+            SetStatus(_mapStack.Count == 1
+                ? "Вы в корневой карте."
+                : $"Открыта карта: {CurrentLevel.Title}");
+        }
+
+        private void ExitMap()
+        {
+            if (_mapStack.Count <= 1)
+            {
+                SetStatus("Вы уже в корневой карте.");
+                return;
+            }
+            NavigateToLevel(_mapStack.Count - 2);
+        }
+
+        private void GoToRoot() => NavigateToLevel(0);
+
+        // ── Вход в карту-узел ──────────────────────────────────────────
+        private void EnterMap(NodeControl ctrl)
+        {
+            SyncCurrentLevelFromCanvas();
+
+            var model = ctrl.Model;
+            model.EmbeddedMap ??= new MapData();
+
+            _mapStack.Add(new MapLevel { Map = model.EmbeddedMap, Title = model.Name });
+            LoadCanvasFromLevel(CurrentLevel);
+
+            SetStatus($"Открыта карта ноды «{model.Name}». ПКМ по фону — создать ноду внутри.");
+        }
+
+        // ── Сжать всю текущую карту в одну ноду ────────────────────────
+        private void CompressCurrentMapIntoNode()
+        {
+            if (_nodes.Count == 0)
+            {
+                SetStatus("Карта пуста — сжимать нечего.");
+                return;
+            }
+
+            SyncCurrentLevelFromCanvas();
+
+            var packed = new MapData
+            {
+                Nodes = CurrentLevel.Map.Nodes.ToList(),
+                Connections = CurrentLevel.Map.Connections.ToList()
+            };
+
+            double cx = (canvasBorder.ActualWidth / 2 - _offsetX) / _scale - AppSettings.NodeDefaultWidth / 2;
+            double cy = (canvasBorder.ActualHeight / 2 - _offsetY) / _scale - AppSettings.NodeDefaultHeight / 2;
+
+            var wrapper = new NodeModel
+            {
+                Name = _mapStack.Count > 1 ? CurrentLevel.Title : "Сжатая карта",
+                X = cx,
+                Y = cy,
+                Width = AppSettings.NodeDefaultWidth,
+                Height = AppSettings.NodeDefaultHeight,
+                FontFamily = AppSettings.NodeDefaultFontFamily,
+                FontSize = AppSettings.NodeDefaultFontSize,
+                BackgroundColorHex = "#282C34",
+                HeaderColorHex = "#8A5AC8",
+                TextColorHex = "#DCDCDC",
+                EmbeddedMap = packed
+            };
+
+            ClearMap();
+            AddNodeControl(wrapper);
+            SyncCurrentLevelFromCanvas();
+
+            SetStatus($"Карта сжата в ноду «{wrapper.Name}» ({packed.Nodes.Count} нод внутри). Двойной клик — открыть.");
+        }
+
+        // ── Сжать ветку (нода + всё, куда ведут стрелки) в одну ноду ───
+        private void CompressBranchIntoNode(NodeControl rootCtrl)
+        {
+            var ids = new HashSet<Guid> { rootCtrl.Model.Id };
+
+            bool added = true;
+            while (added)
+            {
+                added = false;
+                foreach (var c in _connections)
+                {
+                    if (ids.Contains(c.FromNodeId) && ids.Add(c.ToNodeId))
+                        added = true;
+                }
+            }
+
+            if (ids.Count == 1)
+            {
+                SetStatus("У ноды нет исходящих связей — сжимать нечего.");
+                return;
+            }
+
+            SyncCurrentLevelFromCanvas();
+
+            var packedNodes = CurrentLevel.Map.Nodes.Where(n => ids.Contains(n.Id)).ToList();
+            var packedConns = CurrentLevel.Map.Connections
+                .Where(c => ids.Contains(c.FromNodeId) && ids.Contains(c.ToNodeId))
+                .ToList();
+
+            var wrapper = new NodeModel
+            {
+                Name = rootCtrl.Model.Name,
+                X = rootCtrl.Model.X,
+                Y = rootCtrl.Model.Y,
+                Width = rootCtrl.Model.Width,
+                Height = rootCtrl.Model.Height,
+                BackgroundColorHex = rootCtrl.Model.BackgroundColorHex,
+                HeaderColorHex = "#8A5AC8",
+                TextColorHex = rootCtrl.Model.TextColorHex,
+                FontFamily = rootCtrl.Model.FontFamily,
+                FontSize = rootCtrl.Model.FontSize,
+                EmbeddedMap = new MapData { Nodes = packedNodes, Connections = packedConns }
+            };
+
+            DeselectAll();
+
+            foreach (var ctrl in _nodes.Where(n => ids.Contains(n.Model.Id)).ToList())
+            {
+                mainCanvas.Children.Remove(ctrl);
+                _nodes.Remove(ctrl);
+            }
+
+            _connections.RemoveAll(c => ids.Contains(c.FromNodeId) && ids.Contains(c.ToNodeId));
+            foreach (var c in _connections)
+            {
+                if (ids.Contains(c.ToNodeId)) { c.ToNodeId = wrapper.Id; c.ToPort = "left"; }
+                if (ids.Contains(c.FromNodeId)) { c.FromNodeId = wrapper.Id; c.FromPort = "right"; }
+            }
+
+            // убрать возможные дубли связей после пересоединения
+            var seen = new HashSet<(Guid From, Guid To)>();
+            _connections.RemoveAll(c => !seen.Add((c.FromNodeId, c.ToNodeId)));
+
+            foreach (var n in _nodes)
+            {
+                if (n.Model.ConnectedTo.RemoveAll(ids.Contains) > 0)
+                    n.Model.ConnectedTo.Add(wrapper.Id);
+            }
+
+            AddNodeControl(wrapper);
+            SyncCurrentLevelFromCanvas();
+            RedrawArrows();
+
+            SetStatus($"Ветка ({packedNodes.Count} нод) сжата в ноду «{wrapper.Name}».");
+        }
+
+        // ── Добавить ноду из сохранённого файла карты ──────────────────
+        private void AddNodeFromMapFile()
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title = "Добавить ноду из карты",
+                Filter = "Карты узлов (*.wwmap;*.gnmap)|*.wwmap;*.gnmap|Все файлы|*.*"
+            };
+            if (dlg.ShowDialog() != true) return;
+
+            try
+            {
+                var json = System.IO.File.ReadAllText(dlg.FileName);
+                var map = System.Text.Json.JsonSerializer.Deserialize<MapData>(json);
+                if (map == null || map.Nodes.Count == 0)
+                {
+                    SetStatus("Файл пуст или не является картой узлов.");
+                    return;
+                }
+
+                double cx = (canvasBorder.ActualWidth / 2 - _offsetX) / _scale - AppSettings.NodeDefaultWidth / 2;
+                double cy = (canvasBorder.ActualHeight / 2 - _offsetY) / _scale - AppSettings.NodeDefaultHeight / 2;
+
+                var model = new NodeModel
+                {
+                    Name = System.IO.Path.GetFileNameWithoutExtension(dlg.FileName),
+                    X = cx,
+                    Y = cy,
+                    Width = AppSettings.NodeDefaultWidth,
+                    Height = AppSettings.NodeDefaultHeight,
+                    FontFamily = AppSettings.NodeDefaultFontFamily,
+                    FontSize = AppSettings.NodeDefaultFontSize,
+                    BackgroundColorHex = "#282C34",
+                    HeaderColorHex = "#8A5AC8",
+                    TextColorHex = "#DCDCDC",
+                    EmbeddedMap = map
+                };
+
+                AddNodeControl(model);
+                SyncCurrentLevelFromCanvas();
+
+                SetStatus($"Добавлена нода-карта «{model.Name}» ({map.Nodes.Count} нод внутри).");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Не удалось загрузить карту:\n{ex.Message}", "Ошибка",
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -890,12 +1222,157 @@ namespace WebWeaver
 
         private void ClearAll()
         {
+            _mapStack.RemoveRange(1, _mapStack.Count - 1);
+            CurrentLevel.Map.Nodes.Clear();
+            CurrentLevel.Map.Connections.Clear();
             ClearMap();
             _selectedNode = null;
             _connectSource = null;
+            ClearTempLine();
             HideInfoPanel();
             SetStatus("Карта очищена.");
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // ДЕРЕВО НОД (кто к кому принадлежит)
+        // ═══════════════════════════════════════════════════════════════
+        private void BtnTree_Click(object s, RoutedEventArgs e) => ShowNodeTree();
+
+        private void ShowNodeTree()
+        {
+            SyncCurrentLevelFromCanvas();
+
+            var win = new Window
+            {
+                Title = "Дерево нод",
+                Width = 440,
+                Height = 540,
+                Background = new SolidColorBrush(Color.FromRgb(32, 35, 43)),
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this
+            };
+
+            var root = new DockPanel { Margin = new Thickness(10) };
+
+            // ── Текущий путь и кнопки навигации ──
+            var topSp = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+            var lblPath = new TextBlock
+            {
+                Text = "Вы здесь: " + string.Join("  ›  ",
+                    _mapStack.Select((l, i) => i == 0 ? "🏠 Корень" : l.Title)),
+                Foreground = new SolidColorBrush(Color.FromRgb(255, 220, 50)),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+
+            var btnRow = new StackPanel { Orientation = Orientation.Horizontal };
+            var btnUp = new Button
+            {
+                Content = "⬆ Уровень выше",
+                Padding = new Thickness(10, 4, 10, 4),
+                Margin = new Thickness(0, 0, 8, 0),
+                Background = new SolidColorBrush(Color.FromRgb(60, 130, 200)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0)
+            };
+            btnUp.Click += (_, _) => { ExitMap(); win.Close(); };
+
+            var btnRoot = new Button
+            {
+                Content = "🏠 В корень",
+                Padding = new Thickness(10, 4, 10, 4),
+                Background = new SolidColorBrush(Color.FromRgb(60, 130, 200)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0)
+            };
+            btnRoot.Click += (_, _) => { GoToRoot(); win.Close(); };
+
+            btnRow.Children.Add(btnUp);
+            btnRow.Children.Add(btnRoot);
+            topSp.Children.Add(lblPath);
+            topSp.Children.Add(btnRow);
+            DockPanel.SetDock(topSp, Dock.Top);
+            root.Children.Add(topSp);
+
+            var hint = new TextBlock
+            {
+                Text = "Двойной клик по 🗺 — перейти внутрь этой карты.",
+                Foreground = new SolidColorBrush(Color.FromRgb(120, 125, 140)),
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+            DockPanel.SetDock(hint, Dock.Bottom);
+            root.Children.Add(hint);
+
+            // ── Само дерево ──
+            var tv = new TreeView { Background = Brushes.Transparent, BorderThickness = new Thickness(0) };
+
+            void Fill(TreeViewItem parent, MapData map, List<Guid> path)
+            {
+                foreach (var n in map.Nodes)
+                {
+                    if (n.EmbeddedMap != null)
+                    {
+                        var childPath = new List<Guid>(path) { n.Id };
+
+                        var header = new TextBlock
+                        {
+                            Text = "🗺 " + n.Name,
+                            Foreground = new SolidColorBrush(Color.FromRgb(90, 179, 255)),
+                            Cursor = Cursors.Hand
+                        };
+                        header.MouseLeftButtonDown += (_, e2) =>
+                        {
+                            if (e2.ClickCount == 2)
+                            {
+                                e2.Handled = true;
+                                NavigateByPath(childPath);
+                                win.Close();
+                            }
+                        };
+
+                        var item = new TreeViewItem { Header = header, Margin = new Thickness(0, 2, 0, 2) };
+                        Fill(item, n.EmbeddedMap, childPath);
+                        parent.Items.Add(item);
+                    }
+                    else
+                    {
+                        parent.Items.Add(new TreeViewItem
+                        {
+                            Header = new TextBlock
+                            {
+                                Text = "• " + n.Name,
+                                Foreground = new SolidColorBrush(Color.FromRgb(150, 155, 170))
+                            }
+                        });
+                    }
+                }
+            }
+
+            var rootItem = new TreeViewItem
+            {
+                Header = new TextBlock { Text = "🏠 Корень", Foreground = Brushes.White },
+                IsExpanded = true
+            };
+            Fill(rootItem, _mapStack[0].Map, new List<Guid>());
+            tv.Items.Add(rootItem);
+
+            root.Children.Add(tv);
+            win.Content = root;
+            win.ShowDialog();
+        }
+
+        // Переход по цепочке: корень → карта → карта → …
+        private void NavigateByPath(List<Guid> path)
+        {
+            NavigateToLevel(0);
+            foreach (var id in path)
+            {
+                var ctrl = _nodes.FirstOrDefault(n => n.Model.Id == id);
+                if (ctrl?.Model.EmbeddedMap == null) break;
+                EnterMap(ctrl);
+            }
+        }
+
 
         // ═══════════════════════════════════════════════════════════════
         // ЗУМИРОВАНИЕ (кнопки)
@@ -1112,6 +1589,7 @@ namespace WebWeaver
             var canvasPos = ScreenToCanvas(screenPos);
 
             var cm = new ContextMenu();
+
             var mi = new MenuItem { Header = "➕ Создать ноду" };
             mi.Click += (_, _) =>
             {
@@ -1126,11 +1604,20 @@ namespace WebWeaver
                     FontFamily = AppSettings.NodeDefaultFontFamily,
                     FontSize = AppSettings.NodeDefaultFontSize,
                     Width = AppSettings.NodeDefaultWidth,
-                    Height = AppSettings.NodeDefaultHeight,
+                    Height = AppSettings.NodeDefaultHeight
                 };
                 ShowInfoPanelForCreate(model);
             };
             cm.Items.Add(mi);
+
+            var miFromMap = new MenuItem { Header = "📂 Добавить ноду из карты (.wwmap)…" };
+            miFromMap.Click += (_, _) => AddNodeFromMapFile();
+            cm.Items.Add(miFromMap);
+
+            var miCompress = new MenuItem { Header = "🗜 Сжать всю карту в одну ноду" };
+            miCompress.Click += (_, _) => CompressCurrentMapIntoNode();
+            cm.Items.Add(miCompress);
+
             cm.IsOpen = true;
         }
     }
