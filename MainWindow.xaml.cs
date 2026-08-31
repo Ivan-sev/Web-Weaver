@@ -24,6 +24,7 @@ namespace WebWeaver
         private readonly List<ConnectionModel> _connections = new();
         private readonly List<ConnectionArrow> _arrows = new();
 
+
         private double _scale = 1.0;
         private double _offsetX = 0;
         private double _offsetY = 0;
@@ -68,6 +69,19 @@ namespace WebWeaver
 
             // Карты-узлы: начальный уровень + верхняя панель навигации
             _mapStack.Add(new MapLevel { Map = new MapData(), Title = "Корень" });
+
+            //ButtonAnimator.Attach(BtnNewNode, "➕", "➕ Новая нода");
+            //ButtonAnimator.Attach(BtnTree, "🌳", "🌳 Дерево");
+            //ButtonAnimator.Attach(BtnSave, "💾", "💾 Сохранить");
+            //ButtonAnimator.Attach(BtnOpen, "📂", "📂 Открыть");
+            //ButtonAnimator.Attach(BtnClearAll, "🗑", "🗑 Очистить всё");
+            //ButtonAnimator.Attach(BtnFindNode, "🔍", "🔍 Найти нodу");
+            //ButtonAnimator.Attach(BtnZoomIn, "🔍", "Приблизить");
+            //ButtonAnimator.Attach(BtnZoomOut, "🔍", "Отдалить");
+            //ButtonAnimator.Attach(BtnResetView, "⊡", "⊡ Сброс вида");
+            //ButtonAnimator.Attach(BtnHistory, "⏳", "⏳ История");
+
+            InitHistory();
         }
 
         private void MainWindow_Loaded(object s, RoutedEventArgs e)
@@ -295,6 +309,8 @@ namespace WebWeaver
                 mainCanvas.ReleaseMouseCapture();
                 Cursor = Cursors.Arrow;
             }
+
+            PushHistory("Перемещение ноды");
         }
 
         private void MainCanvas_MouseMove(object s, MouseEventArgs e)
@@ -498,6 +514,7 @@ namespace WebWeaver
 
             if (_selectedNode == ctrl) _selectedNode = null;
             SetStatus($"Нода «{ctrl.Model.Name}» удалена.");
+            PushHistory($"Нода удалена: «{ctrl.Model.Name}»");
         }
 
         private void DuplicateNode(NodeControl ctrl)
@@ -525,7 +542,9 @@ namespace WebWeaver
                 ImagePath = ctrl.Model.ImagePath,
                 EmbeddedMap = mapCopy
             };
+
             AddNodeControl(m2);
+            PushHistory($"Дублирование ноды «{m2.Name}»");
         }
 
         private void QuickColorPick(NodeControl ctrl)
@@ -603,6 +622,7 @@ namespace WebWeaver
                 _arrows.Remove(arrow);
                 _connections.Remove(conn);
                 fromCtrl.Model.ConnectedTo.Remove(conn.ToNodeId);
+                PushHistory($"Связь удалена: «{fromCtrl.Model.Name}» → «{toCtrl.Model.Name}»");
                 SetStatus("Связь удалена (ПКМ по линии).");
                 e.Handled = true;
             };
@@ -634,6 +654,7 @@ namespace WebWeaver
                 .ToList();
             foreach (var c in toRemove) RemoveConnection(c);
             SetStatus($"Все связи ноды «{ctrl.Model.Name}» удалены.");
+            PushHistory($"Все связи ноды «{ctrl.Model.Name}» удалены.");
         }
 
         private void RedrawArrows()
@@ -655,12 +676,14 @@ namespace WebWeaver
         {
             infoPanel.LoadForCreate(model);
             AnimateInfoPanel(show: true, large: false);
+            PushHistory("Создание ноды");
         }
 
         private void ShowInfoPanelForEdit(NodeModel model)
         {
             infoPanel.LoadForEdit(model);
             AnimateInfoPanel(show: true, large: false);
+            PushHistory($"Изменение ноды «{model.Name}»");
         }
 
         private void ShowInfoPanelForView(NodeModel model)
@@ -705,6 +728,7 @@ namespace WebWeaver
             {
                 // Новая нода
                 AddNodeControl(model);
+                PushHistory("Создание ноды");
             }
             else
             {
@@ -712,6 +736,7 @@ namespace WebWeaver
                 existing.Refresh();
                 RedrawArrows();
                 SetStatus($"Нода «{model.Name}» обновлена.");
+                PushHistory($"Нода обновлена: «{model.Name}»");
             }
             HideInfoPanel();
         }
@@ -753,6 +778,7 @@ namespace WebWeaver
             ApplyTransform();
             SelectNode(ctrl);
             SetStatus($"Переход к ноде «{ctrl.Model.Name}».");
+            PushHistory($"Переход к ноде: «{ctrl.Model.Name}»");
         }
 
         private void ResetView()
@@ -778,6 +804,21 @@ namespace WebWeaver
                 _connectSource = null;
                 ClearTempLine();
                 SetStatus("Соединение отменено.");
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                UndoHistory();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Z && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+            {
+                RedoHistory();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Y && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                RedoHistory(); // бонус: привычный Ctrl+Y
                 e.Handled = true;
             }
         }
@@ -882,6 +923,7 @@ namespace WebWeaver
                 ResetView();
 
                 SetStatus($"Открыто: {System.IO.Path.GetFileName(path)} ({map.Nodes.Count} нод)");
+                PushHistory($"Открыта карта: {System.IO.Path.GetFileName(path)}");
             }
             catch (Exception ex)
             {
@@ -1015,6 +1057,7 @@ namespace WebWeaver
             SyncCurrentLevelFromCanvas();
 
             SetStatus($"Карта сжата в ноду «{wrapper.Name}» ({packed.Nodes.Count} нод внутри). Двойной клик — открыть.");
+            PushHistory($"Карта сжата в нodу: «{wrapper.Name}»");
         }
 
         // ── Сжать ветку (нода + всё, куда ведут стрелки) в одну ноду ───
@@ -1090,7 +1133,8 @@ namespace WebWeaver
             SyncCurrentLevelFromCanvas();
             RedrawArrows();
 
-            SetStatus($"Ветка ({packedNodes.Count} нод) сжата в ноду «{wrapper.Name}».");
+            SetStatus($"Ветка ({packedNodes.Count} нod) сжата в нodу «{wrapper.Name}».");
+            PushHistory($"Ветка сжата в нodу: «{wrapper.Name}»");
         }
 
         // ── Добавить ноду из сохранённого файла карты ──────────────────
@@ -1135,6 +1179,7 @@ namespace WebWeaver
                 SyncCurrentLevelFromCanvas();
 
                 SetStatus($"Добавлена нода-карта «{model.Name}» ({map.Nodes.Count} нод внутри).");
+                PushHistory($"Добавлена нода-карта «{model.Name}»");
             }
             catch (Exception ex)
             {
@@ -1231,6 +1276,7 @@ namespace WebWeaver
             ClearTempLine();
             HideInfoPanel();
             SetStatus("Карта очищена.");
+            PushHistory("Карта очищена.");
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -1506,6 +1552,7 @@ namespace WebWeaver
             CancelConnection();
             DrawArrow(conn);
             SetStatus($"Связь создана: «{fromName}» → «{toName}».");
+            PushHistory($"Связь создана: «{fromName}» → «{toName}»");
         }
 
         private void CancelConnection()
@@ -1565,6 +1612,8 @@ namespace WebWeaver
                 RedrawArrows();
                 e.Handled = true;
             }
+
+            PushHistory("Перемещение ноды");
         }
 
         private void CanvasBorder_MouseRightButtonUp(object s, MouseButtonEventArgs e)
@@ -1575,6 +1624,7 @@ namespace WebWeaver
                 _connectSource = null;
                 ClearTempLine();
                 SetStatus("Соединение отменено.");
+                PushHistory("Соединение отменено.");
                 e.Handled = true;
                 return;
             }
@@ -1619,6 +1669,195 @@ namespace WebWeaver
             cm.Items.Add(miCompress);
 
             cm.IsOpen = true;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // ИСТОРИЯ ОПЕРАЦИЙ (СНЕПШОТЫ)
+        // ═══════════════════════════════════════════════════════════════
+        private sealed class HistoryEntry
+        {
+            public string Title = "";
+            public string Json = ""; // слепок всей карты на этот момент
+        }
+
+        private readonly List<HistoryEntry> _history = new();
+        private int _historyIndex = -1;
+        private bool _restoring;
+        private const int MaxHistoryEntries = 100;
+
+        // Вызывается при старте, после «Новая карта» и после открытия файла
+        private void InitHistory()
+        {
+            _history.Clear();
+            _historyIndex = -1;
+            _history.Add(new HistoryEntry
+            {
+                Title = "Начальное состояние",
+                Json = System.Text.Json.JsonSerializer.Serialize(_mapStack[0].Map)
+            });
+            _historyIndex = 0;
+        }
+
+        // Вызывается ПОСЛЕ каждой операции, изменившей карту
+        private void PushHistory(string title)
+        {
+            if (_restoring) return;
+            SyncCurrentLevelFromCanvas(); // фиксируем полотно в модели
+
+            string json = System.Text.Json.JsonSerializer.Serialize(_mapStack[0].Map);
+            if (_historyIndex >= 0 && _history[_historyIndex].Json == json) return; // ничего не изменилось
+
+            _history.RemoveRange(_historyIndex + 1, _history.Count - _historyIndex - 1); // срезаем redo-ветку
+            _history.Add(new HistoryEntry { Title = title, Json = json });
+            if (_history.Count > MaxHistoryEntries) _history.RemoveAt(0);
+            _historyIndex = _history.Count - 1;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Отмена, повтор, восстановление
+        // ═══════════════════════════════════════════════════════════════
+        private void UndoHistory()
+        {
+            if (_historyIndex <= 0) { SetStatus("Отменять нечего."); return; }
+            string undone = _history[_historyIndex].Title;
+            _historyIndex--;
+            RestoreHistory(_history[_historyIndex]);
+            SetStatus($"Отменено: {undone}");
+            PushHistory($"Отменено: {undone}");
+        }
+
+        private void RedoHistory()
+        {
+            if (_historyIndex >= _history.Count - 1) { SetStatus("Повторять нечего."); return; }
+            _historyIndex++;
+            RestoreHistory(_history[_historyIndex]);
+            SetStatus($"Повторено: {_history[_historyIndex].Title}");
+            PushHistory($"Повторено: {_history[_historyIndex].Title}");
+        }
+
+        private void RestoreHistory(HistoryEntry entry)
+        {
+            try
+            {
+                var map = System.Text.Json.JsonSerializer.Deserialize<MapData>(entry.Json);
+                if (map == null) return;
+
+                _restoring = true;
+                ClearTempLine();
+                _connectSource = null;
+                DeselectAll();
+                HideInfoPanel();
+
+                _mapStack.Clear();
+                _mapStack.Add(new MapLevel { Map = map, Title = "Корень" });
+
+                LoadCanvasFromLevel(CurrentLevel); // если такого метода нет — вставьте сюда блок загрузки нод из OpenMapFromPath
+                ResetView();
+                _restoring = false;
+            }
+            catch (Exception ex)
+            {
+                _restoring = false;
+                SetStatus("Не удалось восстановить состояние: " + ex.Message);
+            }
+        }
+
+        private void BtnHistory_Click(object sender, RoutedEventArgs e)
+        {
+            var win = new Window
+            {
+                Title = "История операций",
+                Width = 360,
+                Height = 440,
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = new SolidColorBrush(Color.FromRgb(30, 33, 40))
+            };
+
+            var list = new ListBox
+            {
+                Background = Brushes.Transparent,
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Margin = new Thickness(8)
+            };
+
+            for (int i = _history.Count - 1; i >= 0; i--) // свежие сверху
+            {
+                int idx = i; // важно: захватываем копию, иначе лямбда увидит последнее i
+                var item = new ListBoxItem
+                {
+                    Content = (idx == _historyIndex ? "▸ " : idx > _historyIndex ? "↷ " : "") + _history[idx].Title,
+                    Tag = idx
+                };
+                if (idx > _historyIndex) item.Opacity = 0.45; // будущее — то, что можно повторить
+                if (idx == _historyIndex) item.Background = new SolidColorBrush(Color.FromRgb(60, 80, 120));
+                item.MouseDoubleClick += (_, _) => { JumpToHistory(idx); win.Close(); };
+                list.Items.Add(item);
+            }
+
+            var hint = new TextBlock
+            {
+                Text = "Двойной клик — перейти к этому состоянию",
+                Foreground = Brushes.Gray,
+                Margin = new Thickness(10, 6, 0, 6)
+            };
+
+            var root = new DockPanel();
+            DockPanel.SetDock(hint, Dock.Bottom);
+            root.Children.Add(hint);
+            root.Children.Add(list);
+
+            win.Content = root;
+            win.ShowDialog();
+        }
+
+        private void JumpToHistory(int index)
+        {
+            if (index < 0 || index >= _history.Count || index == _historyIndex) return;
+            _historyIndex = index;
+            RestoreHistory(_history[index]);
+            SetStatus($"Возврат к: {_history[index].Title}");
+            PushHistory($"Возвращено к: {_history[index].Title}");
+        }
+    }
+
+    public static class ButtonAnimator
+    {
+        private const int DelayMs = 30; // скорость появления/исчезания букв
+
+        public static void Attach(Button btn, string emoji, string fullText)
+        {
+            btn.Content = emoji;
+            int runId = 0;
+
+            async void TypeIn(int id)
+            {
+                for (int i = 1; i <= fullText.Length; i++)
+                {
+                    if (id != runId) return;
+                    btn.Content = fullText.Substring(0, i);
+                    await Task.Delay(DelayMs);
+                }
+            }
+
+            async void TypeOut(int id)
+            {
+                for (int i = (btn.Content as string ?? "").Length - 1; i >= 0; i--)
+                {
+                    if (id != runId) return;
+                    btn.Content = fullText.Substring(0, i); // буквы исчезают с конца
+                    await Task.Delay(DelayMs);
+                }
+                if (id == runId) btn.Content = emoji; // текст стёрся — возвращаем эмодзи
+            }
+
+            btn.MouseEnter += (_, _) => TypeIn(++runId);
+            btn.MouseLeave += (_, _) =>
+            {
+                if (btn.Content as string == emoji) return; // анимировать нечего
+                TypeOut(++runId);
+            };
         }
     }
 }
