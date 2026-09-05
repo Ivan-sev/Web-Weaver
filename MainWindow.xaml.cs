@@ -20,7 +20,7 @@ namespace WebWeaver
     public partial class MainWindow : Window
     {
         int SetButt = 0;
-        
+
         // ── Состояние ────────────────────────────────────────────────────
         private readonly List<NodeControl> _nodes = new();
         private readonly List<ConnectionModel> _connections = new();
@@ -63,7 +63,7 @@ namespace WebWeaver
 
             PreviewKeyDown += (_, _) => UpdateCtrlCursor();
             PreviewKeyUp += (_, _) => UpdateCtrlCursor();
-            AddHandler( Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler(MainWindow_PreviewMouseUp), true);
+            AddHandler(Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler(MainWindow_PreviewMouseUp), true);
 
             infoPanel.SaveRequested += InfoPanel_SaveRequested;
             infoPanel.CancelRequested += HideInfoPanel;
@@ -155,7 +155,7 @@ namespace WebWeaver
             InitHistory();
         }
 
-        private void MainWindow_PreviewMouseUp( object sender, MouseButtonEventArgs e)
+        private void MainWindow_PreviewMouseUp(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton != MouseButton.Left)
                 return;
@@ -2438,7 +2438,7 @@ namespace WebWeaver
         }
 
 
-        private void MoveDraggedNodesDuringAutoPan( double canvasDx, double canvasDy)
+        private void MoveDraggedNodesDuringAutoPan(double canvasDx, double canvasDy)
         {
             if (_autoPanDragNode == null)
                 return;
