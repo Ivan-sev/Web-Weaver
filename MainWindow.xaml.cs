@@ -19,6 +19,8 @@ namespace WebWeaver
     /// </summary>
     public partial class MainWindow : Window
     {
+        int SetButt = 0;
+        
         // ── Состояние ────────────────────────────────────────────────────
         private readonly List<NodeControl> _nodes = new();
         private readonly List<ConnectionModel> _connections = new();
@@ -59,6 +61,10 @@ namespace WebWeaver
             SizeChanged += (_, _) => RedrawGrid();
             KeyDown += MainWindow_KeyDown;
 
+            PreviewKeyDown += (_, _) => UpdateCtrlCursor();
+            PreviewKeyUp += (_, _) => UpdateCtrlCursor();
+            AddHandler( Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler(MainWindow_PreviewMouseUp), true);
+
             infoPanel.SaveRequested += InfoPanel_SaveRequested;
             infoPanel.CancelRequested += HideInfoPanel;
             infoPanel.LinkNodeRequested += id =>
@@ -70,18 +76,98 @@ namespace WebWeaver
             // Карты-узлы: начальный уровень + верхняя панель навигации
             _mapStack.Add(new MapLevel { Map = new MapData(), Title = "Корень" });
 
-            //ButtonAnimator.Attach(BtnNewNode, "➕", "➕ Новая нода");
-            //ButtonAnimator.Attach(BtnTree, "🌳", "🌳 Дерево");
-            //ButtonAnimator.Attach(BtnSave, "💾", "💾 Сохранить");
-            //ButtonAnimator.Attach(BtnOpen, "📂", "📂 Открыть");
-            //ButtonAnimator.Attach(BtnClearAll, "🗑", "🗑 Очистить всё");
-            //ButtonAnimator.Attach(BtnFindNode, "🔍", "🔍 Найти нodу");
-            //ButtonAnimator.Attach(BtnZoomIn, "🔍", "Приблизить");
-            //ButtonAnimator.Attach(BtnZoomOut, "🔍", "Отдалить");
-            //ButtonAnimator.Attach(BtnResetView, "⊡", "⊡ Сброс вида");
-            //ButtonAnimator.Attach(BtnHistory, "⏳", "⏳ История");
+
+            switch (SetButt)
+            {
+                case 1:
+                    {
+                        ButtonAnimator.Attach(BtnNewNode, "➕", "➕ Новая нода");
+                        ButtonAnimator.Attach(BtnTree, "🌳", "🌳 Дерево");
+                        ButtonAnimator.Attach(BtnSave, "💾", "💾 Сохранить");
+                        ButtonAnimator.Attach(BtnOpen, "📂", "📂 Открыть");
+                        ButtonAnimator.Attach(BtnClearAll, "🗑", "🗑 Очистить всё");
+                        ButtonAnimator.Attach(BtnFindNode, "🔍", "🔍 Найти нodу");
+                        ButtonAnimator.Attach(BtnZoomIn, "🔍", "Приблизить");
+                        ButtonAnimator.Attach(BtnZoomOut, "🔍", "Отдалить");
+                        ButtonAnimator.Attach(BtnResetView, "⊡", "⊡ Сброс вида");
+                        ButtonAnimator.Attach(BtnHistory, "⏳", "⏳ История");
+                    }
+                    break;
+                case 2:
+                    {
+                        int InitialShowDelay = 500; // Задержка перед появлением подсказки (в миллисекундах)
+                        int ShowDuration = 10000; // Время отображения подсказки (в миллисекундах)
+                        int BetweenShowDelay = 100; // Задержка между показом разных подсказок (в миллисекундах)
+
+                        ToolTipService.SetInitialShowDelay(BtnNewNode, InitialShowDelay);
+                        ToolTipService.SetShowDuration(BtnNewNode, ShowDuration);
+                        ToolTipService.SetBetweenShowDelay(BtnNewNode, BetweenShowDelay);
+                        BtnNewNode.Content = "➕";
+
+                        ToolTipService.SetInitialShowDelay(BtnTree, InitialShowDelay);
+                        ToolTipService.SetShowDuration(BtnTree, ShowDuration);
+                        ToolTipService.SetBetweenShowDelay(BtnTree, BetweenShowDelay);
+                        BtnTree.Content = "🌳";
+
+                        ToolTipService.SetInitialShowDelay(BtnSave, InitialShowDelay);
+                        ToolTipService.SetShowDuration(BtnSave, ShowDuration);
+                        ToolTipService.SetBetweenShowDelay(BtnSave, BetweenShowDelay);
+                        BtnSave.Content = "💾";
+
+                        ToolTipService.SetInitialShowDelay(BtnOpen, InitialShowDelay);
+                        ToolTipService.SetShowDuration(BtnOpen, ShowDuration);
+                        ToolTipService.SetBetweenShowDelay(BtnOpen, BetweenShowDelay);
+                        BtnOpen.Content = "📂";
+
+                        ToolTipService.SetInitialShowDelay(BtnClearAll, InitialShowDelay);
+                        ToolTipService.SetShowDuration(BtnClearAll, ShowDuration);
+                        ToolTipService.SetBetweenShowDelay(BtnClearAll, BetweenShowDelay);
+                        BtnClearAll.Content = "🗑";
+
+                        ToolTipService.SetInitialShowDelay(BtnFindNode, InitialShowDelay);
+                        ToolTipService.SetShowDuration(BtnFindNode, ShowDuration);
+                        ToolTipService.SetBetweenShowDelay(BtnFindNode, BetweenShowDelay);
+                        BtnFindNode.Content = "🔍";
+
+                        ToolTipService.SetInitialShowDelay(BtnZoomIn, InitialShowDelay);
+                        ToolTipService.SetShowDuration(BtnZoomIn, ShowDuration);
+                        ToolTipService.SetBetweenShowDelay(BtnZoomIn, BetweenShowDelay);
+                        BtnZoomIn.Content = "🔍➕";
+
+                        ToolTipService.SetInitialShowDelay(BtnZoomOut, InitialShowDelay);
+                        ToolTipService.SetShowDuration(BtnZoomOut, ShowDuration);
+                        ToolTipService.SetBetweenShowDelay(BtnZoomOut, BetweenShowDelay);
+                        BtnZoomOut.Content = "🔍➖";
+
+                        ToolTipService.SetInitialShowDelay(BtnResetView, InitialShowDelay);
+                        ToolTipService.SetShowDuration(BtnResetView, ShowDuration);
+                        ToolTipService.SetBetweenShowDelay(BtnResetView, BetweenShowDelay);
+                        BtnResetView.Content = "⊡";
+
+                        ToolTipService.SetInitialShowDelay(BtnHistory, InitialShowDelay);
+                        ToolTipService.SetShowDuration(BtnHistory, ShowDuration);
+                        ToolTipService.SetBetweenShowDelay(BtnHistory, BetweenShowDelay);
+                        BtnHistory.Content = "⏳";
+                    }
+                    break;
+            }
 
             InitHistory();
+        }
+
+        private void MainWindow_PreviewMouseUp( object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Left)
+                return;
+
+            if (_autoPanDragNode == null)
+                return;
+
+            _autoPanDragNode = null;
+
+            // При рамочном выделении таймер остановит FinishRubberSelection.
+            if (!_rubberActive)
+                StopAutoPan();
         }
 
         private void MainWindow_Loaded(object s, RoutedEventArgs e)
@@ -266,6 +352,13 @@ namespace WebWeaver
 
         private void MainCanvas_MouseLeftButtonDown(object s, MouseButtonEventArgs e)
         {
+            // Ctrl + ЛКМ по фону — рамка выделения
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            {
+                StartRubberSelection(e);
+                e.Handled = true;
+                return;
+            }
             if (e.ClickCount == 2)
             {
                 // Прячем панель только при двойном клике по пустому месту.
@@ -303,6 +396,13 @@ namespace WebWeaver
 
         private void MainCanvas_MouseLeftButtonUp(object s, MouseButtonEventArgs e)
         {
+            if (_rubberActive)
+            {
+                FinishRubberSelection(e);
+                e.Handled = true;
+                return;
+            }
+
             if (_isPanning)
             {
                 _isPanning = false;
@@ -310,11 +410,20 @@ namespace WebWeaver
                 Cursor = Cursors.Arrow;
             }
 
-            PushHistory("Перемещение ноды");
+            PushHistory(_groupSelection.Count > 1 ? $"Перемещение нод ({_groupSelection.Count})" : "Перемещение ноды");
         }
 
         private void MainCanvas_MouseMove(object s, MouseEventArgs e)
         {
+            UpdateCtrlCursor();
+
+            if (_rubberActive)
+            {
+                _rubberLastScreen = e.GetPosition(canvasBorder);
+                UpdateRubberRect();
+                return;
+            }
+
             if (_isPanning)
             {
                 var cur = e.GetPosition(canvasBorder);
@@ -387,12 +496,7 @@ namespace WebWeaver
         // ═══════════════════════════════════════════════════════════════
         private void CreateNode(Point canvasPos)
         {
-            // Учитываем текущий масштаб и смещение
-            var model = new NodeModel
-            {
-                X = (canvasPos.X - _offsetX / _scale),
-                Y = (canvasPos.Y - _offsetY / _scale),
-            };
+            var model = new NodeModel { X = canvasPos.X, Y = canvasPos.Y };
             ShowInfoPanelForCreate(model);
         }
 
@@ -425,6 +529,32 @@ namespace WebWeaver
                     EnterMap(c);                      // карта-узел → открываем вложенную карту
                 else
                     ShowInfoPanelForView(c.Model);    // обычная нода → блокнот
+            };
+            ctrl.PreviewMouseLeftButtonDown += (_, e2) =>
+            {
+                if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+                {
+                    // Ctrl+ЛКМ теперь не блокирует перетаскивание.
+                    // Если нода ещё не выделена — добавляем её в группу.
+                    if (!_groupSelection.Contains(ctrl))
+                        AddToGroupSelection(ctrl);
+
+                    SnapshotGroupPositions();
+                }
+                else
+                {
+                    // Обычный ЛКМ по ноде вне группы сбрасывает групповое выделение.
+                    if (!_groupSelection.Contains(ctrl))
+                        ClearGroupSelection();
+
+                    SnapshotGroupPositions();
+                }
+
+                _autoPanDragNode = ctrl;
+                StartAutoPan();
+
+                // ВАЖНО: e2.Handled = true здесь не ставить.
+                // Событие должно дойти до NodeControl, чтобы он начал перетаскивание.
             };
 
             Canvas.SetLeft(ctrl, model.X);
@@ -754,6 +884,8 @@ namespace WebWeaver
 
         private void DeselectAll()
         {
+            ClearGroupSelection();
+
             if (_selectedNode != null)
             {
                 _selectedNode.SetSelected(false);
@@ -792,7 +924,139 @@ namespace WebWeaver
         // ═══════════════════════════════════════════════════════════════
         // БУФЕР ОБМЕНА
         // ═══════════════════════════════════════════════════════════════
-        private NodeModel? _clipboard;
+        private sealed class ClipboardData
+        {
+            public List<NodeModel> Nodes { get; set; } = new();
+            public List<ConnectionModel> Connections { get; set; } = new();
+        }
+
+        private ClipboardData? _clipboard;
+        private int _pasteShift; // чтобы повторные Ctrl+V не вставали точно друг на друга
+
+        private void CopySelectedGroupToClipboard(bool cut = false)
+        {
+            // если группы нет, но есть одиночная выделенная нода — работаем с ней
+            if (_groupSelection.Count == 0 && _selectedNode != null)
+                AddToGroupSelection(_selectedNode);
+
+            if (_groupSelection.Count == 0) { SetStatus("Нет выделенных нод."); return; }
+
+            var ids = _groupSelection.Select(n => n.Model.Id).ToHashSet();
+
+            var data = new ClipboardData();
+            foreach (var ctrl in _groupSelection)
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(ctrl.Model);
+                var copy = System.Text.Json.JsonSerializer.Deserialize<NodeModel>(json)!;
+                // в ConnectedTo оставляем только ссылки на ноды внутри копии
+                copy.ConnectedTo.RemoveAll(id => !ids.Contains(id));
+                data.Nodes.Add(copy);
+            }
+
+            foreach (var conn in _connections)
+                if (ids.Contains(conn.FromNodeId) && ids.Contains(conn.ToNodeId))
+                    data.Connections.Add(new ConnectionModel
+                    {
+                        FromNodeId = conn.FromNodeId,
+                        ToNodeId = conn.ToNodeId,
+                        FromPort = conn.FromPort,
+                        ToPort = conn.ToPort
+                    });
+
+            _clipboard = data;
+
+            if (cut)
+            {
+                int count = ids.Count;
+                DeleteSelectedGroup(); // сам пишет историю
+                SetStatus($"Вырезано нод: {count} — вставьте Ctrl+V.");
+            }
+            else
+            {
+                SetStatus($"Скопировано нод: {data.Nodes.Count} — вставьте Ctrl+V.");
+            }
+        }
+
+        private void PasteFromClipboard()
+        {
+            if (_clipboard == null || _clipboard.Nodes.Count == 0)
+            {
+                SetStatus("Буфер обмена пуст.");
+                return;
+            }
+
+            // полная копия буфера: каждый Ctrl+V даёт независимые ноды
+            var json = System.Text.Json.JsonSerializer.Serialize(_clipboard);
+            var data = System.Text.Json.JsonSerializer.Deserialize<ClipboardData>(json)!;
+
+            var idMap = new Dictionary<Guid, Guid>();
+            foreach (var n in data.Nodes)
+            {
+                idMap[n.Id] = Guid.NewGuid();
+                n.Id = idMap[n.Id];
+            }
+
+            // центр видимой области
+            double cx = (canvasBorder.ActualWidth / 2 - _offsetX) / _scale;
+            double cy = (canvasBorder.ActualHeight / 2 - _offsetY) / _scale;
+
+            double midX = data.Nodes.Average(n => n.X + n.Width / 2);
+            double midY = data.Nodes.Average(n => n.Y + n.Height / 2);
+            double shift = _pasteShift % 300;
+            _pasteShift += 30;
+
+            var newCtrls = new List<NodeControl>();
+
+            foreach (var n in data.Nodes)
+            {
+                n.X += cx - midX + shift;
+                n.Y += cy - midY + shift;
+
+                n.ConnectedTo.RemoveAll(id => !idMap.ContainsKey(id));
+                for (int i = 0; i < n.ConnectedTo.Count; i++)
+                    n.ConnectedTo[i] = idMap[n.ConnectedTo[i]];
+            }
+
+            DeselectAll();
+
+            foreach (var n in data.Nodes)
+            {
+                AddNodeControl(n);
+                newCtrls.Add(_nodes.First(x => ReferenceEquals(x.Model, n)));
+            }
+
+            var newConns = new List<ConnectionModel>();
+            foreach (var c in data.Connections)
+            {
+                if (!idMap.TryGetValue(c.FromNodeId, out var f) ||
+                    !idMap.TryGetValue(c.ToNodeId, out var t))
+                    continue;
+
+                var nc = new ConnectionModel
+                {
+                    FromNodeId = f,
+                    ToNodeId = t,
+                    FromPort = c.FromPort,
+                    ToPort = c.ToPort
+                };
+                _connections.Add(nc);
+                var fc = _nodes.First(x => x.Model.Id == f);
+                if (!fc.Model.ConnectedTo.Contains(t)) fc.Model.ConnectedTo.Add(t);
+                newConns.Add(nc);
+            }
+
+            Dispatcher.InvokeAsync(() =>
+            {
+                foreach (var nc in newConns) DrawArrow(nc);
+            }, System.Windows.Threading.DispatcherPriority.Loaded);
+
+            foreach (var ctrl in newCtrls) AddToGroupSelection(ctrl);
+            SnapshotGroupPositions();
+
+            PushHistory($"Вставка нод ({data.Nodes.Count})");
+            SetStatus($"Вставлено нод: {data.Nodes.Count}");
+        }
+
 
         // ═══════════════════════════════════════════════════════════════
         // ГОРЯЧИЕ КЛАВИШИ
@@ -805,6 +1069,33 @@ namespace WebWeaver
                 ClearTempLine();
                 SetStatus("Соединение отменено.");
                 e.Handled = true;
+            }
+            else if (e.Key == Key.Escape && Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+            {
+                if (_rubberActive)
+                {
+                    // отменяем незавершённую рамку
+                    if (_rubberRect != null)
+                    {
+                        mainCanvas.Children.Remove(_rubberRect);
+                        _rubberRect = null;
+                    }
+                    _rubberActive = false;
+                    StopAutoPan();
+                    mainCanvas.ReleaseMouseCapture();
+                    canvasBorder.ReleaseMouseCapture();
+                    Cursor = Cursors.Arrow;
+                }
+                else
+                {
+                    ClearGroupSelection();
+                    DeselectAll();
+                    HideInfoPanel();
+                }
+
+                SetStatus("Выделение снято");
+                e.Handled = true;
+                return;
             }
             else if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control)
             {
@@ -819,6 +1110,40 @@ namespace WebWeaver
             else if (e.Key == Key.Y && Keyboard.Modifiers == ModifierKeys.Control)
             {
                 RedoHistory(); // бонус: привычный Ctrl+Y
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape && _rubberActive)
+            {
+                CancelRubberSelection();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Delete && _groupSelection.Count > 0 && Keyboard.FocusedElement is not System.Windows.Controls.TextBox)
+            {
+                DeleteSelectedGroup();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.D && Keyboard.Modifiers == ModifierKeys.Control && _groupSelection.Count > 0 &&
+                Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+            {
+                DeleteSelectedGroup();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control && _groupSelection.Count > 0 &&
+    Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+            {
+                CopySelectedGroupToClipboard();          // копировать
+                e.Handled = true;
+            }
+            else if (e.Key == Key.X && Keyboard.Modifiers == ModifierKeys.Control && _groupSelection.Count > 0 &&
+                Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+            {
+                CopySelectedGroupToClipboard(cut: true); // вырезать
+                e.Handled = true;
+            }
+            else if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control && // вставка
+                Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase)
+            {
+                PasteFromClipboard();
                 e.Handled = true;
             }
         }
@@ -1258,6 +1583,9 @@ namespace WebWeaver
 
         private void ClearMap()
         {
+            ClearGroupSelection();
+            _savedNodeCursor.Clear();
+
             _nodes.ForEach(n => mainCanvas.Children.Remove(n));
             _arrows.ForEach(a => mainCanvas.Children.Remove(a));
             _nodes.Clear();
@@ -1434,6 +1762,37 @@ namespace WebWeaver
 
         private void NodeCtrl_NodeMoved(NodeControl ctrl)
         {
+            // Группа едет вслед за перетаскиваемой нодой
+            if (_groupSelection.Contains(ctrl))
+            {
+                if (_groupDragPos.TryGetValue(ctrl, out var prev))
+                {
+                    double dx = ctrl.Model.X - prev.X;
+                    double dy = ctrl.Model.Y - prev.Y;
+
+                    if (dx != 0 || dy != 0)
+                    {
+                        foreach (var other in _groupSelection)
+                        {
+                            if (ReferenceEquals(other, ctrl)) continue;
+                            other.Model.X += dx;
+                            other.Model.Y += dy;
+                            Canvas.SetLeft(other, other.Model.X);
+                            Canvas.SetTop(other, other.Model.Y);
+                            _groupDragPos[other] = (other.Model.X, other.Model.Y);
+                            UpdateNodeArrows(other);
+                        }
+                    }
+                }
+                _groupDragPos[ctrl] = (ctrl.Model.X, ctrl.Model.Y);
+            }
+
+            UpdateNodeArrows(ctrl);
+        }
+
+        // Бывшее тело NodeCtrl_NodeMoved — обновление стрелок одной ноды
+        private void UpdateNodeArrows(NodeControl ctrl)
+        {
             var related = _connections
                 .Where(c => c.FromNodeId == ctrl.Model.Id || c.ToNodeId == ctrl.Model.Id)
                 .ToList();
@@ -1447,13 +1806,8 @@ namespace WebWeaver
                 var toCtrl = _nodes.FirstOrDefault(n => n.Model.Id == conn.ToNodeId);
                 if (fromCtrl == null || toCtrl == null) continue;
 
-                Point from = conn.FromPort == "left"
-                    ? fromCtrl.GetLeftPortCenter()
-                    : fromCtrl.GetRightPortCenter();
-
-                Point to = conn.ToPort == "left"
-                    ? toCtrl.GetLeftPortCenter()
-                    : toCtrl.GetRightPortCenter();
+                Point from = conn.FromPort == "left" ? fromCtrl.GetLeftPortCenter() : fromCtrl.GetRightPortCenter();
+                Point to = conn.ToPort == "left" ? toCtrl.GetLeftPortCenter() : toCtrl.GetRightPortCenter();
 
                 arrow.Update(from, to);
             }
@@ -1561,16 +1915,46 @@ namespace WebWeaver
             ClearTempLine();
         }
 
-        private void CanvasBorder_MouseLeftButtonDown(object s, MouseButtonEventArgs e)
+        private void CanvasBorder_MouseLeftButtonDown(object s, MouseButtonEventArgs e) // !!!
         {
-            // Не отменяем соединение по ЛКМ — только панорамирование
-            // Соединение отменяется только через ПКМ или Escape
+            // Ctrl + ЛКМ — рамка выделения
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+            {
+                if (!_rubberActive) StartRubberSelection(e);
+                e.Handled = true;
+                return;
+            }
+
+            // Клик по пустому месту — снять выделение.
+            // Определяем по координатам карты, а не по e.OriginalSource:
+            // после панорамирования hit-test по визуальному дереву ненадёжен.
+            if (!IsClickOverNode(e))
+            {
+                ClearGroupSelection();
+                DeselectAll();
+                HideInfoPanel();
+            }
 
             _isPanning = true;
             _panStart = e.GetPosition(canvasBorder);
             canvasBorder.CaptureMouse();
             Cursor = Cursors.SizeAll;
             e.Handled = true;
+        }
+
+        private bool IsClickOverNode(MouseButtonEventArgs e) // !!!
+        {
+            var p = ScreenToCanvas(e.GetPosition(canvasBorder));
+            const double slack = 4; // небольшой запас у края ноды
+
+            foreach (var ctrl in _nodes)
+            {
+                var m = ctrl.Model;
+                if (p.X >= m.X - slack && p.X <= m.X + m.Width + slack &&
+                    p.Y >= m.Y - slack && p.Y <= m.Y + m.Height + slack)
+                    return true;
+            }
+            return false;
         }
 
         private void CanvasBorder_MouseMove(object s, MouseEventArgs e)
@@ -1602,8 +1986,15 @@ namespace WebWeaver
             }
         }
 
-        private void CanvasBorder_MouseLeftButtonUp(object s, MouseButtonEventArgs e)
+        private void CanvasBorder_MouseLeftButtonUp(object s, MouseButtonEventArgs e) // !!!
         {
+            if (_rubberActive)
+            {
+                FinishRubberSelection(e);
+                e.Handled = true;
+                return;
+            }
+
             if (_isPanning)
             {
                 _isPanning = false;
@@ -1613,7 +2004,7 @@ namespace WebWeaver
                 e.Handled = true;
             }
 
-            PushHistory("Перемещение ноды");
+            PushHistory(_groupSelection.Count > 1 ? $"Перемещение нод ({_groupSelection.Count})" : "Перемещение ноды");
         }
 
         private void CanvasBorder_MouseRightButtonUp(object s, MouseButtonEventArgs e)
@@ -1819,6 +2210,399 @@ namespace WebWeaver
             RestoreHistory(_history[index]);
             SetStatus($"Возврат к: {_history[index].Title}");
             PushHistory($"Возвращено к: {_history[index].Title}");
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // ГРУППОВОЕ ВЫДЕЛЕНИЕ (Ctrl + ЛКМ)
+        // ═══════════════════════════════════════════════════════════════
+        private static readonly System.Windows.Media.Effects.DropShadowEffect GroupGlow = CreateGroupGlow();
+        private static System.Windows.Media.Effects.DropShadowEffect CreateGroupGlow()
+        {
+            var fx = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                Color = Color.FromRgb(90, 179, 255),
+                BlurRadius = 14,
+                ShadowDepth = 0,
+                Opacity = 0.9
+            };
+            fx.Freeze();
+            return fx;
+        }
+
+        private readonly List<NodeControl> _groupSelection = new();
+        private readonly Dictionary<NodeControl, (double X, double Y)> _groupDragPos = new();
+        private readonly Dictionary<NodeControl, Cursor> _savedNodeCursor = new();
+
+        private bool _rubberActive;
+        private Point _rubberStartCanvas;  // первый угол рамки (координаты карты)
+        private Point _rubberLastScreen;   // курсор (координаты canvasBorder)
+        private Rectangle? _rubberRect;
+        private System.Windows.Threading.DispatcherTimer? _autoPanTimer;
+        private NodeControl? _autoPanDragNode;
+
+        private const double EdgeZonePx = 40;  // зона у края, запускающая панораму
+        private const double PanSpeedPx = 12;  // скорость панорамы за тик
+
+        // ── Курсор «+» при Ctrl ───────────────────────────────────────
+        private void UpdateCtrlCursor()
+        {
+            bool ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control) || _rubberActive;
+            var cur = ctrl ? Cursors.Cross : null;
+            canvasBorder.Cursor = cur;
+            mainCanvas.Cursor = cur;
+
+            foreach (var n in _nodes)
+            {
+                if (ctrl)
+                {
+                    if (!_savedNodeCursor.ContainsKey(n)) _savedNodeCursor[n] = n.Cursor;
+                    n.Cursor = Cursors.Cross;
+                }
+                else if (_savedNodeCursor.TryGetValue(n, out var saved))
+                {
+                    n.Cursor = saved; // возвращаем исходный курсор ноды
+                    _savedNodeCursor.Remove(n);
+                }
+            }
+        }
+
+        // ── Рамка выделения ───────────────────────────────────────────
+        private void StartRubberSelection(MouseButtonEventArgs e) // !!!
+        {
+            // Потерянный MouseUp после панорамирования оставил захват/флаги — сбрасываем
+            if (_rubberActive || _isPanning)
+            {
+                _rubberActive = false;
+                _isPanning = false;
+                StopAutoPan();
+
+                if (_rubberRect != null)
+                {
+                    mainCanvas.Children.Remove(_rubberRect);
+                    _rubberRect = null;
+                }
+
+                mainCanvas.ReleaseMouseCapture();
+                canvasBorder.ReleaseMouseCapture();
+                Cursor = Cursors.Arrow;
+            }
+
+            _rubberLastScreen = e.GetPosition(canvasBorder);
+            _rubberStartCanvas = ScreenToCanvas(_rubberLastScreen);
+            _rubberActive = true;
+
+            // Ctrl+Shift — добавлять к уже выделенному, иначе выделение с нуля
+            if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+                ClearGroupSelection();
+
+            _rubberRect = new Rectangle
+            {
+                Stroke = new SolidColorBrush(Color.FromRgb(90, 179, 255)),
+                StrokeThickness = 1.5,
+                Fill = new SolidColorBrush(Color.FromArgb(36, 90, 179, 255)),
+                IsHitTestVisible = false
+            };
+            Panel.SetZIndex(_rubberRect, 999);
+            mainCanvas.Children.Add(_rubberRect);
+
+            mainCanvas.CaptureMouse();
+            UpdateRubberRect();
+            StartAutoPan();
+        }
+
+        private void FinishRubberSelection(MouseButtonEventArgs? e = null)
+        {
+            _rubberActive = false;
+            StopAutoPan();
+            mainCanvas.ReleaseMouseCapture();
+            if (_rubberRect != null) { mainCanvas.Children.Remove(_rubberRect); _rubberRect = null; }
+
+            var rect = new Rect(_rubberStartCanvas, ScreenToCanvas(e?.GetPosition(canvasBorder) ?? Mouse.GetPosition(canvasBorder)));
+            foreach (var ctrl in _nodes)
+                if (rect.IntersectsWith(GetNodeRect(ctrl)))   // Contains — только полное попадание
+                    AddToGroupSelection(ctrl);
+
+            SnapshotGroupPositions();
+            SetStatus($"Выделено нод: {_groupSelection.Count}");
+        }
+
+        private void CancelRubberSelection()
+        {
+            _rubberActive = false;
+            StopAutoPan();
+            mainCanvas.ReleaseMouseCapture();
+            if (_rubberRect != null) { mainCanvas.Children.Remove(_rubberRect); _rubberRect = null; }
+            SetStatus("Выделение отменено.");
+        }
+
+        private void UpdateRubberRect()
+        {
+            if (_rubberRect == null) return;
+            var r = new Rect(_rubberStartCanvas, ScreenToCanvas(_rubberLastScreen));
+            _rubberRect.Width = r.Width;
+            _rubberRect.Height = r.Height;
+            Canvas.SetLeft(_rubberRect, r.X);
+            Canvas.SetTop(_rubberRect, r.Y);
+        }
+
+        // ── Автопанорама у края формы ─────────────────────────────────
+        private void StartAutoPan()
+        {
+            // Не создавать несколько таймеров одновременно.
+            if (_autoPanTimer != null)
+                return;
+
+            _autoPanTimer =
+                new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(16)
+                };
+
+            _autoPanTimer.Tick += AutoPanTick;
+            _autoPanTimer.Start();
+        }
+
+        private void StopAutoPan()
+        {
+            if (_autoPanTimer == null)
+                return;
+
+            _autoPanTimer.Stop();
+            _autoPanTimer.Tick -= AutoPanTick;
+            _autoPanTimer = null;
+        }
+
+        private void AutoPanTick(object? sender, EventArgs e)
+        {
+            bool draggingNode =
+                _autoPanDragNode != null &&
+                Mouse.LeftButton == MouseButtonState.Pressed;
+
+            // Таймер нужен либо рамке, либо перетаскиваемой ноде.
+            if (!_rubberActive && !draggingNode)
+            {
+                _autoPanDragNode = null;
+                StopAutoPan();
+                return;
+            }
+
+            // Читаем текущую позицию непосредственно у мыши.
+            // Это работает даже тогда, когда MouseMove больше не приходит.
+            Point mouse = Mouse.GetPosition(canvasBorder);
+            _rubberLastScreen = mouse;
+
+            double dx = 0;
+            double dy = 0;
+
+            if (mouse.X <= EdgeZonePx)
+                dx = PanSpeedPx;
+            else if (mouse.X >= canvasBorder.ActualWidth - EdgeZonePx)
+                dx = -PanSpeedPx;
+
+            if (mouse.Y <= EdgeZonePx)
+                dy = PanSpeedPx;
+            else if (mouse.Y >= canvasBorder.ActualHeight - EdgeZonePx)
+                dy = -PanSpeedPx;
+
+            if (dx == 0 && dy == 0)
+            {
+                // Рамка всё равно должна следовать за курсором.
+                if (_rubberActive)
+                    UpdateRubberRect();
+
+                return;
+            }
+
+            // Перемещаем карту.
+            _offsetX += dx;
+            _offsetY += dy;
+
+            translateT.X = _offsetX;
+            translateT.Y = _offsetY;
+
+            RedrawGrid();
+
+            if (_rubberActive)
+            {
+                UpdateRubberRect();
+            }
+
+            if (draggingNode)
+            {
+                // Компенсируем смещение карты, чтобы перетаскиваемая
+                // нода визуально оставалась под курсором.
+                MoveDraggedNodesDuringAutoPan(
+                    -dx / _scale,
+                    -dy / _scale);
+            }
+        }
+
+
+        private void MoveDraggedNodesDuringAutoPan( double canvasDx, double canvasDy)
+        {
+            if (_autoPanDragNode == null)
+                return;
+
+            List<NodeControl> targets;
+
+            if (_groupSelection.Contains(_autoPanDragNode))
+            {
+                // Если перетаскиваемая нода входит в группу,
+                // перемещаем всю группу.
+                targets = _groupSelection.ToList();
+            }
+            else
+            {
+                targets = new List<NodeControl>
+        {
+            _autoPanDragNode
+        };
+            }
+
+            foreach (var node in targets)
+            {
+                node.Model.X += canvasDx;
+                node.Model.Y += canvasDy;
+
+                Canvas.SetLeft(node, node.Model.X);
+                Canvas.SetTop(node, node.Model.Y);
+
+                // Обновляем сохранённую позицию группы, чтобы очередное
+                // событие NodeMoved не переместило группу повторно.
+                if (_groupSelection.Contains(node))
+                {
+                    _groupDragPos[node] =
+                        (node.Model.X, node.Model.Y);
+                }
+
+                UpdateNodeArrows(node);
+            }
+        }
+
+        // ── Управление группой ────────────────────────────────────────
+        private void AddToGroupSelection(NodeControl ctrl)
+        {
+            if (_groupSelection.Contains(ctrl)) return;
+            _groupSelection.Add(ctrl);
+            ctrl.Effect = GroupGlow;
+            _groupDragPos[ctrl] = (ctrl.Model.X, ctrl.Model.Y);
+        }
+
+        private void ToggleGroupSelection(NodeControl ctrl)
+        {
+            if (_groupSelection.Remove(ctrl))
+            {
+                ctrl.Effect = null;
+                _groupDragPos.Remove(ctrl);
+            }
+            else AddToGroupSelection(ctrl);
+            SetStatus($"В выделении: {_groupSelection.Count}");
+        }
+
+        private void ClearGroupSelection()
+        {
+            foreach (var n in _groupSelection) n.Effect = null;
+            _groupSelection.Clear();
+            _groupDragPos.Clear();
+        }
+
+        private void SnapshotGroupPositions()
+        {
+            foreach (var c in _groupSelection)
+                _groupDragPos[c] = (c.Model.X, c.Model.Y);
+        }
+
+        private Rect GetNodeRect(NodeControl n)
+        {
+            double w = n.ActualWidth > 0 ? n.ActualWidth : n.Model.Width;
+            double h = n.ActualHeight > 0 ? n.ActualHeight : n.Model.Height;
+            return new Rect(n.Model.X, n.Model.Y, w, h);
+        }
+
+        // ── Удаление группы ───────────────────────────────────────────
+        private void DeleteSelectedGroup()
+        {
+            if (_groupSelection.Count == 0) return;
+            var ids = _groupSelection.Select(n => n.Model.Id).ToHashSet();
+
+            var conns = _connections
+                .Where(c => ids.Contains(c.FromNodeId) || ids.Contains(c.ToNodeId))
+                .ToList();
+            foreach (var c in conns) RemoveConnection(c);
+
+            foreach (var ctrl in _groupSelection.ToList())
+            {
+                mainCanvas.Children.Remove(ctrl);
+                _nodes.Remove(ctrl);
+                if (_selectedNode == ctrl) _selectedNode = null;
+            }
+
+            foreach (var n in _nodes)
+                n.Model.ConnectedTo.RemoveAll(ids.Contains);
+
+            int count = ids.Count;
+            ClearGroupSelection();
+            PushHistory($"Удаление нод ({count})");
+            SetStatus($"Удалено нод: {count}");
+        }
+
+        // ── Дублирование группы ───────────────────────────────────────
+        private void DuplicateSelectedGroup()
+        {
+            if (_groupSelection.Count == 0) return;
+
+            var idMap = new Dictionary<Guid, NodeModel>();
+            var newCtrls = new List<NodeControl>();
+
+            foreach (var ctrl in _groupSelection)
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(ctrl.Model);
+                var copy = System.Text.Json.JsonSerializer.Deserialize<NodeModel>(json)!; // глубокая копия, включая EmbeddedMap
+                copy.Id = Guid.NewGuid();
+                copy.X += 30;
+                copy.Y += 30;
+                copy.ConnectedTo.Clear(); // пересобираем связи ниже
+                idMap[ctrl.Model.Id] = copy;
+            }
+
+            ClearGroupSelection();
+
+            foreach (var copy in idMap.Values)
+            {
+                AddNodeControl(copy);
+                newCtrls.Add(_nodes.First(n => ReferenceEquals(n.Model, copy)));
+            }
+
+            var newConns = new List<ConnectionModel>();
+            foreach (var conn in _connections.ToList())
+            {
+                if (idMap.TryGetValue(conn.FromNodeId, out var fc) &&
+                    idMap.TryGetValue(conn.ToNodeId, out var tc))
+                {
+                    var nc = new ConnectionModel
+                    {
+                        FromNodeId = fc.Id,
+                        ToNodeId = tc.Id,
+                        FromPort = conn.FromPort,
+                        ToPort = conn.ToPort
+                    };
+                    _connections.Add(nc);
+                    if (!fc.ConnectedTo.Contains(tc.Id)) fc.ConnectedTo.Add(tc.Id);
+                    newConns.Add(nc);
+                }
+            }
+
+            // Стрелки — после того как ноды получат реальные размеры
+            Dispatcher.InvokeAsync(() =>
+            {
+                foreach (var nc in newConns) DrawArrow(nc);
+            }, System.Windows.Threading.DispatcherPriority.Loaded);
+
+            foreach (var c in newCtrls) AddToGroupSelection(c); // копии остаются выделенными
+            SnapshotGroupPositions();
+
+            PushHistory($"Дублирование нод ({idMap.Count})");
+            SetStatus($"Продублировано нод: {idMap.Count}");
         }
     }
 
