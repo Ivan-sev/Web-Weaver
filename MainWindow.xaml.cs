@@ -150,7 +150,7 @@ namespace WebWeaver
                         BtnClearAll_Click(this, new RoutedEventArgs());
                         e.Handled = true;
                         break;
-                        
+
                     case Key.OemPlus: // Ctrl + "+" -> Приблизить
                         BtnZoomIn_Click(this, new RoutedEventArgs());
                         e.Handled = true;
@@ -1460,11 +1460,11 @@ namespace WebWeaver
         }
 
         // ── Начало соединения (правый порт) ──────────────────────────
-        private void NodeCtrl_RequestConnectFrom(NodeControl ctrl) => 
+        private void NodeCtrl_RequestConnectFrom(NodeControl ctrl) =>
             StartConnecting(ctrl, fromLeft: false);
 
         // ── Начало соединения (левый порт) ───────────────────────────
-        private void NodeCtrl_RequestConnectFromLeft(NodeControl ctrl) => 
+        private void NodeCtrl_RequestConnectFromLeft(NodeControl ctrl) =>
             StartConnecting(ctrl, fromLeft: true);
 
         private void StartConnecting(NodeControl ctrl, bool fromLeft)
@@ -1596,7 +1596,7 @@ namespace WebWeaver
             {
                 var pos = e.GetPosition(mainCanvas);
                 _tempLine.X2 = pos.X;
-                _tempLine.Y2 = pos.Y; 
+                _tempLine.Y2 = pos.Y;
                 _tempLine.X2 = pos.X;
                 _tempLine.Y2 = pos.Y;
             }
