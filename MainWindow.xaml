@@ -44,7 +44,7 @@
                 <Button x:Name="BtnHistory" DockPanel.Dock="Left" Content="⏳ История"
                         Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
                         Click="BtnHistory_Click" ToolTip="История изменений"/>
-                
+
                 <Separator DockPanel.Dock="Left" Background="#2A2D38" Width="1" Margin="4,4"/>
 
                 <Button x:Name="BtnSave" DockPanel.Dock="Left" Content="💾 Сохранить"
@@ -56,7 +56,7 @@
                         Click="BtnOpen_Click" ToolTip="Открыть карту (Ctrl+O)"/>
 
                 <Separator DockPanel.Dock="Left" Background="#2A2D38" Width="1" Margin="4,4"/>
-                
+
                 <Button x:Name="BtnClearAll" DockPanel.Dock="Left" Content="🗑 Очистить всё"
                         Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
                         Click="BtnClearAll_Click" ToolTip="Очистить всё (Ctrl+Del)"/>
@@ -67,10 +67,10 @@
 
                 <Separator DockPanel.Dock="Left" Background="#2A2D38" Width="1" Margin="4,4"/>
 
-                <Button x:Name="BtnZoomIn" DockPanel.Dock="Left" Content="🔍＋" ToolTip="Приблизить (Ctrl-)"
+                <Button x:Name="BtnZoomIn" DockPanel.Dock="Left" Content="🔍＋" ToolTip="Приблизить (Ctrl+)"
                         Style="{StaticResource ActionBtn}" Margin="0,0,4,0"
                         Click="BtnZoomIn_Click"/>
-                <Button x:Name="BtnZoomOut" DockPanel.Dock="Left" Content="🔍−" ToolTip="Отдалить (Ctrl+)"
+                <Button x:Name="BtnZoomOut" DockPanel.Dock="Left" Content="🔍−" ToolTip="Отдалить (Ctrl-)"
                         Style="{StaticResource ActionBtn}" Margin="0,0,4,0"
                         Click="BtnZoomOut_Click"/>
                 <Button x:Name="BtnResetView" DockPanel.Dock="Left" Content="⊡ Сброс вида" ToolTip="Сбросить масштаб и положение (Ctrl+Home)"
