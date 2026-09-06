@@ -23,6 +23,10 @@ public partial class InfoPanel : UserControl
     public event Action? CancelRequested;
     public event Action<Guid>? LinkNodeRequested;
 
+    private bool _viewEditing;
+
+    private List<NodeModel>? _viewNodes;
+
     private NodeModel? _current;
     private bool _isViewMode;
 
@@ -46,17 +50,55 @@ public partial class InfoPanel : UserControl
 
         txName.Text = model.Name;
         txText.Text = model.Text;
-        txText.TextChanged += (_, _) => RebuildPreview(allNodes);
 
-        // Ссылки
-        var links = model.ConnectedTo
+        _viewNodes = allNodes.ToList();
+
+        var childLinks = model.ConnectedTo
             .Select(id => allNodes.FirstOrDefault(n => n.Id == id))
             .Where(n => n != null)
-            .Select(n => new NodeLinkItem { NodeId = n!.Id, DisplayName = $"→ {n.Name}" })
-            .ToList();
-        icLinks.ItemsSource = links;
+            .Select(n => new NodeLinkItem { NodeId = n!.Id, DisplayName = $"→ {n.Name}" });
 
-        RebuildPreview(allNodes);
+        var parentLinks = allNodes
+            .Where(n => n.ConnectedTo.Contains(model.Id))
+            .Select(n => new NodeLinkItem { NodeId = n.Id, DisplayName = $"{n.Name} →" });
+
+        icLinks.ItemsSource = parentLinks.Concat(childLinks).ToList();
+
+        ShowViewPreview(); // при каждом открытии — режим «Текст ноды»
+    }
+
+    private void BtnToggleText_Click(object s, RoutedEventArgs e)
+    {
+        if (_viewEditing) ShowViewPreview();
+        else ShowViewEditor();
+    }
+
+    private void ShowViewEditor()
+    {
+        _viewEditing = true;
+        tbTextLabel.Text = "Блокнот";
+        tbLinkHint.Visibility = Visibility.Visible;
+        rtbPreview.Visibility = Visibility.Collapsed;
+        txText.Visibility = Visibility.Visible;
+        btnToggleText.Content = "Предпросмотр";
+        txText.Focus();
+        txText.CaretIndex = txText.Text.Length;
+    }
+
+    private void ShowViewPreview()
+    {
+        _viewEditing = false;
+        tbTextLabel.Text = "Текст ноды";
+        tbLinkHint.Visibility = Visibility.Collapsed;
+        txText.Visibility = Visibility.Collapsed;
+        rtbPreview.Visibility = Visibility.Visible;
+        btnToggleText.Content = "Изменить";
+        if (_viewNodes != null) RebuildPreview(_viewNodes);
+    }
+
+    private void TxText_ViewChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_viewNodes != null) RebuildPreview(_viewNodes);
     }
 
     public void LoadForEdit(NodeModel model) => 
@@ -95,98 +137,121 @@ public partial class InfoPanel : UserControl
     }
 
     // ── Предпросмотр текста блокнота ──────────────────────────────
-    private void RebuildPreview(IEnumerable<NodeModel> allNodes)
+    private static readonly SolidColorBrush LinkBrush = new(Color.FromRgb(0x5A, 0xB3, 0xFF));
+
+    private void RebuildPreview(IReadOnlyList<NodeModel> nodes)
     {
         rtbPreview.Document.Blocks.Clear();
         var para = new Paragraph();
-        var text = txText.Text ?? "";
-        var lines = text.Split('\n');
 
-        foreach (var rawLine in lines)
+        foreach (var rawLine in (txText.Text ?? "").Split('\n'))
+            ParseLine(rawLine, nodes, para);
+
+        rtbPreview.Document.Blocks.Add(para);
+    }
+
+    private void ParseLine(string line, IReadOnlyList<NodeModel> nodes, Paragraph para)
+    {
+        int i = 0;
+        while (i < line.Length)
         {
-            var line = rawLine;
-            int start = 0;
-            while (start < line.Length)
+            int bracket = line.IndexOf('[', i);
+            int http = line.IndexOf("http", i, StringComparison.OrdinalIgnoreCase);
+
+            int next;
+            bool isBracket;
+            if (bracket >= 0 && (http < 0 || bracket < http)) { next = bracket; isBracket = true; }
+            else if (http >= 0) { next = http; isBracket = false; }
+            else { para.Inlines.Add(new Run(line[i..])); break; }
+
+            if (next > i) para.Inlines.Add(new Run(line[i..next]));
+
+            if (isBracket)
             {
-                // Ссылка на ноду [имя]
-                int bracketOpen = line.IndexOf('[', start);
-                int httpIdx = line.IndexOf("http", start, StringComparison.OrdinalIgnoreCase);
+                int close = line.IndexOf(']', next + 1);
+                if (close < 0) { para.Inlines.Add(new Run(line[next..])); break; }
 
-                // Выбрать ближайший маркер
-                int markerIdx = -1;
-                bool isHttp = false;
-
-                if (bracketOpen >= 0 && (httpIdx < 0 || bracketOpen <= httpIdx))
-                    markerIdx = bracketOpen;
-                else if (httpIdx >= 0)
-                { markerIdx = httpIdx; isHttp = true; }
-
-                if (markerIdx < 0)
+                // Новый синтаксис: [текст]:[цель]
+                if (close + 2 < line.Length && line[close + 1] == ':' && line[close + 2] == '[')
                 {
-                    // Обычный текст до конца
-                    para.Inlines.Add(new Run(line[start..]));
-                    break;
-                }
+                    int close2 = line.IndexOf(']', close + 3);
+                    if (close2 < 0) { para.Inlines.Add(new Run(line[next..])); break; }
 
-                // Текст до маркера
-                if (markerIdx > start)
-                    para.Inlines.Add(new Run(line[start..markerIdx]));
-
-                if (!isHttp)
-                {
-                    // Ссылка на ноду [имя]
-                    int bracketClose = line.IndexOf(']', bracketOpen + 1);
-                    if (bracketClose < 0)
-                    {
-                        para.Inlines.Add(new Run(line[markerIdx..]));
-                        break;
-                    }
-                    var nodeName = line[(bracketOpen + 1)..bracketClose];
-                    var target = allNodes.FirstOrDefault(n =>
-                        n.Name.Equals(nodeName, StringComparison.OrdinalIgnoreCase));
-
-                    var hl = new Hyperlink(new Run($"[{nodeName}]"))
-                    {
-                        Foreground = new SolidColorBrush(Color.FromRgb(90, 179, 255)),
-                        Cursor = Cursors.Hand,
-                        TextDecorations = null
-                    };
-                    if (target != null)
-                        hl.Click += (_, _) => LinkNodeRequested?.Invoke(target.Id);
-                    else
-                    {
-                        hl.Foreground = Brushes.OrangeRed;
-                        hl.ToolTip = "Нода не найдена";
-                    }
-                    para.Inlines.Add(hl);
-                    start = bracketClose + 1;
+                    AddSmartLink(para,
+                        line[(next + 1)..close].Trim(),
+                        line[(close + 3)..close2].Trim(),
+                        nodes);
+                    i = close2 + 1;
                 }
                 else
                 {
-                    // Интернет-ссылка https://...
-                    int end = line.IndexOf(' ', markerIdx);
-                    if (end < 0) end = line.Length;
-                    var url = line[markerIdx..end];
-
-                    var hl = new Hyperlink(new Run(url))
-                    {
-                        NavigateUri = Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri : null,
-                        Foreground = new SolidColorBrush(Color.FromRgb(90, 200, 120)),
-                        Cursor = Cursors.Hand,
-                        TextDecorations = TextDecorations.Underline
-                    };
-                    hl.RequestNavigate += (_, e) =>
-                    {
-                        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(e.Uri.ToString()) { UseShellExecute = true }); }
-                        catch { }
-                    };
-                    para.Inlines.Add(hl);
-                    start = end;
+                    // Прежний синтаксис: [имя ноды] — показываем со скобками, как раньше
+                    string name = line[(next + 1)..close];
+                    AddSmartLink(para, $"[{name}]", name, nodes);
+                    i = close + 1;
                 }
             }
-            para.Inlines.Add(new LineBreak());
+            else
+            {
+                // Голый URL до пробела
+                int end = line.IndexOf(' ', next);
+                if (end < 0) end = line.Length;
+                AddSmartLink(para, line[next..end], line[next..end], nodes);
+                i = end;
+            }
         }
-        rtbPreview.Document.Blocks.Add(para);
+        para.Inlines.Add(new LineBreak());
+    }
+
+    private void AddSmartLink(Paragraph para, string display, string target,
+                              IReadOnlyList<NodeModel> nodes)
+    {
+        if (display.Length == 0) display = target;
+
+        bool isUrl = target.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                  || target.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                  || target.StartsWith("www.", StringComparison.OrdinalIgnoreCase);
+
+        var hl = new Hyperlink(new Run(display))
+        {
+            Foreground = LinkBrush,
+            FontWeight = FontWeights.Bold,   // жирный синий, как в задании
+            Cursor = Cursors.Hand,
+            TextDecorations = null
+        };
+
+        if (isUrl)
+        {
+            string url = target.StartsWith("www.", StringComparison.OrdinalIgnoreCase)
+                       ? "https://" + target
+                       : target;
+            if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                hl.NavigateUri = uri;
+            hl.RequestNavigate += (_, e) =>
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(
+                        new System.Diagnostics.ProcessStartInfo(e.Uri.ToString())
+                        { UseShellExecute = true });
+                }
+                catch { }
+            };
+        }
+        else
+        {
+            var node = nodes.FirstOrDefault(n =>
+                n.Name.Equals(target, StringComparison.OrdinalIgnoreCase));
+            if (node != null)
+                hl.Click += (_, _) => LinkNodeRequested?.Invoke(node.Id);
+            else
+            {
+                hl.Foreground = Brushes.OrangeRed;
+                hl.ToolTip = "Нода не найдена";
+            }
+        }
+
+        para.Inlines.Add(hl);
     }
 
     // ── Шрифты ───────────────────────────────────────────────────
@@ -284,22 +349,28 @@ public partial class InfoPanel : UserControl
             LinkNodeRequested?.Invoke(id);
     }
 
-         private void cbFont_SelectionChanged(object sender, SelectionChangedEventArgs e)
-         {
+    private void cbFont_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
 
-         }
-
-         // ── Выбор цвета через палитру ────────────────────────────────
-         private void OpenColorPicker(TextBox targetTextBox)
-         {
-             var dlg = new ColorPickerDialog(targetTextBox.Text);
-             if (dlg.ShowDialog() == true)
-             {
-                 targetTextBox.Text = dlg.SelectedColor;
-             }
-         }
-
-         private void PrevBg_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => OpenColorPicker(txBgColor);
-         private void PrevHeader_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => OpenColorPicker(txHeaderColor);
-         private void PrevText_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => OpenColorPicker(txTextColor);
     }
+
+    private void LinkItem_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is NodeLinkItem item)
+            LinkNodeRequested?.Invoke(item.NodeId);
+    }
+
+    // ── Выбор цвета через палитру ────────────────────────────────
+    private void OpenColorPicker(TextBox targetTextBox)
+    {
+        var dlg = new ColorPickerDialog(targetTextBox.Text);
+        if (dlg.ShowDialog() == true)
+        {
+            targetTextBox.Text = dlg.SelectedColor;
+        }
+    }
+
+    private void PrevBg_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => OpenColorPicker(txBgColor);
+    private void PrevHeader_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => OpenColorPicker(txHeaderColor);
+    private void PrevText_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => OpenColorPicker(txTextColor);
+}
