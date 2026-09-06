@@ -57,52 +57,65 @@
                 <TextBox x:Name="txName" Style="{StaticResource FieldBox}" Margin="0,0,0,10"/>
 
                 <!-- РЕЖИМ ПРОСМОТРА/БЛОКНОТА — видно только в режиме 3/4 -->
-                <StackPanel x:Name="spViewMode" Visibility="Collapsed">
-                    <!-- Связанные ноды -->
+                <StackPanel x:Name="spViewMode">
+
+                    <!-- заголовок ноды, кнопки, TextBlock «Связанные ноды» ...   -->
                     <TextBlock Text="Связанные ноды" Foreground="#CCCCCC" FontSize="11" Margin="0,0,0,3"/>
-                    <ItemsControl x:Name="icLinks" Margin="0,0,0,10">
+
+                    <ItemsControl x:Name="icLinks" Margin="0,0,0,8">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Button Content="{Binding DisplayName}"
-                                        Tag="{Binding NodeId}"
-                                        HorizontalAlignment="Left"
-                                        Background="Transparent"
-                                        BorderThickness="0"
-                                        Foreground="#5AB3FF"
-                                        FontSize="12"
-                                        Cursor="Hand"
-                                        Margin="0,2"
-                                        Click="LinkBtn_Click"/>
+                            <Button Content="{Binding DisplayName}"
+                            Padding="6,1" Margin="0,0,0,2"
+                            HorizontalAlignment="Left"
+                            Background="#3C82C8" Foreground="White"
+                            BorderThickness="0" Cursor="Hand"
+                            Click="LinkItem_Click"/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <!-- Текст как блокнот -->
-                    <TextBlock Text="Текст ноды" Foreground="#CCCCCC" FontSize="11" Margin="0,0,0,3"/>
-                    <TextBlock Foreground="#888888" FontSize="10" Margin="0,0,0,4"
-                               TextWrapping="Wrap"
-                               Text="Ссылка на ноду: [имя ноды]  •  Интернет: https://..."/>
-                    <TextBox x:Name="txText"
-                             MinHeight="180"
-                             AcceptsReturn="True" AcceptsTab="True"
-                             TextWrapping="Wrap"
-                             VerticalScrollBarVisibility="Auto"
-                             Style="{StaticResource FieldBox}"
-                             FontFamily="Consolas" FontSize="13"
-                             Margin="0,0,0,8"/>
+                    <!-- ── НОВОЕ: строка «Текст ноды» + кнопка «Изменить» ── -->
+                    <DockPanel Margin="0,0,0,3">
+                        <Button x:Name="btnToggleText" DockPanel.Dock="Right"
+                Content="Изменить" Padding="10,2" FontSize="11"
+                Background="#3C82C8" Foreground="White"
+                BorderThickness="0" Cursor="Hand"
+                Click="BtnToggleText_Click"/>
+                        <TextBlock x:Name="tbTextLabel" Text="Текст ноды"
+                   Foreground="#CCCCCC" FontSize="11"
+                   VerticalAlignment="Center"/>
+                    </DockPanel>
 
-                    <!-- Рендер текста с кликабельными ссылками -->
-                    <TextBlock Text="Предпросмотр:" Foreground="#CCCCCC" FontSize="11" Margin="0,4,0,3"/>
+                    <!-- ── НОВОЕ: подсказка, по умолчанию скрыта ── -->
+                    <TextBlock x:Name="tbLinkHint"
+               Foreground="#888888" FontSize="10"
+               Margin="0,0,0,4" TextWrapping="Wrap"
+               Visibility="Collapsed"
+               Text="Ссылка на ноду: [отображаемый текст]:[имя ноды]  •  Интернет: [отображаемый текст]:[https://...]"/>
+
+                    <!-- ── Редактор: был txText — заменяем, скрыт по умолчанию ── -->
+                    <TextBox x:Name="txText"
+             MinHeight="180"
+             AcceptsReturn="True" AcceptsTab="True"
+             TextWrapping="Wrap"
+             VerticalScrollBarVisibility="Auto"
+             FontFamily="Consolas" FontSize="13"
+             Visibility="Collapsed"
+             Margin="0,0,0,8"/>
+
+                    <!-- ── Предпросмотр: был rtbPreview — заменяем, виден по умолчанию ── -->
                     <RichTextBox x:Name="rtbPreview"
-                                 IsReadOnly="True"
-                                 Background="#1C1E24"
-                                 Foreground="White"
-                                 BorderBrush="#3C82C8"
-                                 BorderThickness="1"
-                                 Padding="8"
-                                 MinHeight="80"
-                                 Margin="0,0,0,10"
-                                 FontSize="13"/>
+                        IsReadOnly="True"
+                        IsDocumentEnabled="True"
+                        Background="#1E1E1E"
+                        Foreground="White"
+                        BorderBrush="#3F3F46" BorderThickness="1"
+                        VerticalScrollBarVisibility="Auto"
+                        Margin="0,0,0,8">
+                        <FlowDocument Foreground="White"/>
+                    </RichTextBox>
+
                 </StackPanel>
 
                 <!-- РЕЖИМ РЕДАКТОРА — только в 1/3 -->
