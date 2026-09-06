@@ -50,6 +50,9 @@ namespace WebWeaver
         // ── Текущий файл (для перезаписи) ────────────────────────────────
         private string? _currentFilePath;
 
+        // Нода, которую сейчас смотрят в блокноте — для центрирования при закрытии панели
+        private NodeControl? _lastViewedNode;
+
         public MainWindow()
         {
             // ВАЖНО: до InitializeComponent
@@ -70,7 +73,10 @@ namespace WebWeaver
             infoPanel.LinkNodeRequested += id =>
             {
                 var ctrl = _nodes.FirstOrDefault(n => n.Model.Id == id);
-                if (ctrl != null) FocusNode(ctrl);
+                if (ctrl == null) return;
+
+                SelectNode(ctrl);
+                ShowInfoPanelForView(ctrl.Model); // уже вызывает EnsureNodeVisibleInFreeZone
             };
 
             // Карты-узлы: начальный уровень + верхняя панель навигации
@@ -521,7 +527,6 @@ namespace WebWeaver
             ctrl.Resized += (c, _) => NodeCtrl_NodeMoved(c);
             ctrl.RequestConnectFrom += NodeCtrl_RequestConnectFrom;
             ctrl.RequestConnectFromLeft += NodeCtrl_RequestConnectFromLeft;
-            //ctrl.DoubleClicked += c => ShowInfoPanelForView(c.Model);
             ctrl.RightClicked += (c, _) => ShowNodeContextMenu(c);
             ctrl.DoubleClicked += c =>
             {
@@ -707,23 +712,7 @@ namespace WebWeaver
         // ═══════════════════════════════════════════════════════════════
         // СОЕДИНЕНИЯ
         // ═══════════════════════════════════════════════════════════════
-        private void StartConnection(NodeControl source)
-        {
-            _connectSource = source;
-            var sp = source.GetRightPortCenter();
-            _tempLine = new Line
-            {
-                X1 = sp.X,
-                Y1 = sp.Y,
-                X2 = sp.X,
-                Y2 = sp.Y,
-                Stroke = new SolidColorBrush(AppSettings.ConnectionColor),
-                StrokeThickness = 2,
-                StrokeDashArray = new DoubleCollection { 4, 2 }
-            };
-            mainCanvas.Children.Add(_tempLine);
-            SetStatus("Кликните по другой ноде для соединения...");
-        }
+        private void StartConnection(NodeControl source) => StartConnecting(source, fromLeft: false);
 
         private void DrawArrow(ConnectionModel conn)
         {
@@ -820,12 +809,26 @@ namespace WebWeaver
         {
             infoPanel.LoadForView(model, _nodes.Select(n => n.Model));
             AnimateInfoPanel(show: true, large: true);
+
+            var ctrl = _nodes.FirstOrDefault(n => n.Model.Id == model.Id);
+            if (ctrl != null)
+            {
+                _lastViewedNode = ctrl; // ← запомнили, чей блокнот открыт
+                Dispatcher.InvokeAsync(() => EnsureNodeVisibleInFreeZone(ctrl),
+                    System.Windows.Threading.DispatcherPriority.Loaded);
+            }
         }
 
         private void HideInfoPanel()
         {
             AnimateInfoPanel(show: false, large: _infoPanelIsLarge);
             _infoPanelVisible = false;
+
+            // ← всё, что ниже, — добавка
+            var ctrl = _lastViewedNode;
+            _lastViewedNode = null;
+            if (ctrl != null && _nodes.Contains(ctrl))
+                CenterNodeOnScreen(ctrl);
         }
 
         private void AnimateInfoPanel(bool show, bool large)
@@ -2603,6 +2606,60 @@ namespace WebWeaver
 
             PushHistory($"Дублирование нод ({idMap.Count})");
             SetStatus($"Продублировано нод: {idMap.Count}");
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // ВИДИМОСТЬ НОДЫ ПРИ ОТКРЫТОЙ ПАНЕЛИ
+        // ═══════════════════════════════════════════════════════════════
+        private void EnsureNodeVisibleInFreeZone(NodeControl ctrl)
+        {
+            double W = canvasBorder.ActualWidth;
+            double H = canvasBorder.ActualHeight;
+            if (W <= 0 || H <= 0) return;
+
+            // ширина, которую панель займёт в открытом состоянии
+            // (работает и для 320 px, и для "большого" блокнота — берём факт)
+            double zoneLeft = infoPanel.ActualWidth;
+            double zoneW = W - zoneLeft;
+            if (zoneW < 50) return; // панель заняла почти всё — двигать некуда
+
+            // прямоугольник ноды в экранных координатах
+            var r = GetNodeRect(ctrl);
+            var screen = new Rect(
+                r.X * _scale + _offsetX,
+                r.Y * _scale + _offsetY,
+                r.Width * _scale,
+                r.Height * _scale);
+
+            const double pad = 12; // запас от краёв
+            bool fullyVisible =
+                screen.Left >= zoneLeft + pad &&
+                screen.Right <= W - pad &&
+                screen.Top >= pad &&
+                screen.Bottom <= H - pad;
+
+            if (fullyVisible) return; // нода и так видна — карту не дёргаем
+
+            // центрируем ноду в свободной (правой) зоне
+            double targetX = zoneLeft + zoneW / 2;
+            double targetY = H / 2;
+
+            _offsetX = targetX - (r.X + r.Width / 2) * _scale;
+            _offsetY = targetY - (r.Y + r.Height / 2) * _scale;
+
+            ApplyTransform(); // обновит translateT, сетку и стрелки
+        }
+
+        private void CenterNodeOnScreen(NodeControl ctrl)
+        {
+            double W = canvasBorder.ActualWidth;
+            double H = canvasBorder.ActualHeight;
+            if (W <= 0 || H <= 0) return;
+
+            var r = GetNodeRect(ctrl);
+            _offsetX = W / 2 - (r.X + r.Width / 2) * _scale;
+            _offsetY = H / 2 - (r.Y + r.Height / 2) * _scale;
+            ApplyTransform(); // обновит translateT, сетку и стрелки
         }
     }
 
