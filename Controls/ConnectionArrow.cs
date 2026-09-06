@@ -59,25 +59,22 @@ public class ConnectionArrow : Shape
         double dy = tip.Y - origin.Y;
 
         double trueAngle = Math.Atan2(dy, dx);
-
         double absAngle = Math.Abs(trueAngle);
-        double tiltFactor;
 
-        if (absAngle < 1.200)
-            tiltFactor = 0.0;
-        else if (absAngle < 1.50)
-            tiltFactor = 0.30;
-        else
-            tiltFactor = 0.90;
-
-        // Ближайшее горизонтальное направление
+        // Ближайшее горизонтальное направление: 0 (вправо) или ±PI (влево)
         double horizontal = absAngle > Math.PI / 2
-            ? Math.Sign(trueAngle) * Math.PI
+            ? (trueAngle > 0 ? Math.PI : -Math.PI)
             : 0.0;
 
-        double angle = horizontal + (trueAngle - horizontal) * tiltFactor;
+        double deviation = trueAngle - horizontal;
+        double absDev = Math.Abs(deviation);
 
-        // ============================================================
+        double tiltFactor;
+        if (absDev < 1.200) tiltFactor = 0.0;
+        else if (absDev < 1.400) tiltFactor = 0.30;
+        else tiltFactor = 0.90;
+
+        double angle = horizontal + deviation * tiltFactor;
 
         const double size = 11;
         const double spread = 0.42;
