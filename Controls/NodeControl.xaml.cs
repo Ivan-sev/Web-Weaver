@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -7,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using WebWeaver.Models;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace WebWeaver.Controls;
 
@@ -41,7 +43,7 @@ public partial class NodeControl : UserControl
     public void Refresh()
     {
         tbTitle.Text = Model.Name;
-        tbText.Text = Model.Text;
+        tbText.Text = ParseLine(Model.Text);
 
         // Цвета
         TrySetColor(borderMain, "Background", Model.BackgroundColorHex);
@@ -82,6 +84,22 @@ public partial class NodeControl : UserControl
             imgContent.Visibility = Visibility.Collapsed;
             tbText.Visibility = Visibility.Visible;
         }
+    }
+
+    private string ParseLine(string line)
+    {
+        while (line.Contains("]:["))
+        {
+            Match match = Regex.Match(line, @"\[([^\]]+)\]:\[[^\]]+\]");
+
+            if (match.Success)
+            {
+                line = line.Replace(match.Value, $"'{match.Groups[1].Value}'");
+            }
+            else { break; } // Если что то пошло не так, выходим из цикла
+        }
+        
+        return line;
     }
 
     private static void TrySetColor(FrameworkElement el, string prop, string hex)
