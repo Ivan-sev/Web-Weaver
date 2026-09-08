@@ -1,13 +1,14 @@
-﻿using System;
-using System.Linq;
+﻿using Microsoft.Win32;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
-using Microsoft.Win32;
 using WebWeaver.Controls;
 using WebWeaver.Models;
 using WebWeaver.Services;
@@ -19,8 +20,6 @@ namespace WebWeaver
     /// </summary>
     public partial class MainWindow : Window
     {
-        int SetButt = 0;
-
         // ── Состояние ────────────────────────────────────────────────────
         private readonly List<NodeControl> _nodes = new();
         private readonly List<ConnectionModel> _connections = new();
@@ -82,82 +81,6 @@ namespace WebWeaver
             // Карты-узлы: начальный уровень + верхняя панель навигации
             _mapStack.Add(new MapLevel { Map = new MapData(), Title = "Корень" });
 
-
-            switch (SetButt)
-            {
-                case 1:
-                    {
-                        ButtonAnimator.Attach(BtnNewNode, "➕", "➕ Новая нода");
-                        ButtonAnimator.Attach(BtnTree, "🌳", "🌳 Дерево");
-                        ButtonAnimator.Attach(BtnSave, "💾", "💾 Сохранить");
-                        ButtonAnimator.Attach(BtnOpen, "📂", "📂 Открыть");
-                        ButtonAnimator.Attach(BtnClearAll, "🗑", "🗑 Очистить всё");
-                        ButtonAnimator.Attach(BtnFindNode, "🔍", "🔍 Найти нodу");
-                        ButtonAnimator.Attach(BtnZoomIn, "🔍", "Приблизить");
-                        ButtonAnimator.Attach(BtnZoomOut, "🔍", "Отдалить");
-                        ButtonAnimator.Attach(BtnResetView, "⊡", "⊡ Сброс вида");
-                        ButtonAnimator.Attach(BtnHistory, "⏳", "⏳ История");
-                    }
-                    break;
-                case 2:
-                    {
-                        int InitialShowDelay = 500; // Задержка перед появлением подсказки (в миллисекундах)
-                        int ShowDuration = 10000; // Время отображения подсказки (в миллисекундах)
-                        int BetweenShowDelay = 100; // Задержка между показом разных подсказок (в миллисекундах)
-
-                        ToolTipService.SetInitialShowDelay(BtnNewNode, InitialShowDelay);
-                        ToolTipService.SetShowDuration(BtnNewNode, ShowDuration);
-                        ToolTipService.SetBetweenShowDelay(BtnNewNode, BetweenShowDelay);
-                        BtnNewNode.Content = "➕";
-
-                        ToolTipService.SetInitialShowDelay(BtnTree, InitialShowDelay);
-                        ToolTipService.SetShowDuration(BtnTree, ShowDuration);
-                        ToolTipService.SetBetweenShowDelay(BtnTree, BetweenShowDelay);
-                        BtnTree.Content = "🌳";
-
-                        ToolTipService.SetInitialShowDelay(BtnSave, InitialShowDelay);
-                        ToolTipService.SetShowDuration(BtnSave, ShowDuration);
-                        ToolTipService.SetBetweenShowDelay(BtnSave, BetweenShowDelay);
-                        BtnSave.Content = "💾";
-
-                        ToolTipService.SetInitialShowDelay(BtnOpen, InitialShowDelay);
-                        ToolTipService.SetShowDuration(BtnOpen, ShowDuration);
-                        ToolTipService.SetBetweenShowDelay(BtnOpen, BetweenShowDelay);
-                        BtnOpen.Content = "📂";
-
-                        ToolTipService.SetInitialShowDelay(BtnClearAll, InitialShowDelay);
-                        ToolTipService.SetShowDuration(BtnClearAll, ShowDuration);
-                        ToolTipService.SetBetweenShowDelay(BtnClearAll, BetweenShowDelay);
-                        BtnClearAll.Content = "🗑";
-
-                        ToolTipService.SetInitialShowDelay(BtnFindNode, InitialShowDelay);
-                        ToolTipService.SetShowDuration(BtnFindNode, ShowDuration);
-                        ToolTipService.SetBetweenShowDelay(BtnFindNode, BetweenShowDelay);
-                        BtnFindNode.Content = "🔍";
-
-                        ToolTipService.SetInitialShowDelay(BtnZoomIn, InitialShowDelay);
-                        ToolTipService.SetShowDuration(BtnZoomIn, ShowDuration);
-                        ToolTipService.SetBetweenShowDelay(BtnZoomIn, BetweenShowDelay);
-                        BtnZoomIn.Content = "🔍➕";
-
-                        ToolTipService.SetInitialShowDelay(BtnZoomOut, InitialShowDelay);
-                        ToolTipService.SetShowDuration(BtnZoomOut, ShowDuration);
-                        ToolTipService.SetBetweenShowDelay(BtnZoomOut, BetweenShowDelay);
-                        BtnZoomOut.Content = "🔍➖";
-
-                        ToolTipService.SetInitialShowDelay(BtnResetView, InitialShowDelay);
-                        ToolTipService.SetShowDuration(BtnResetView, ShowDuration);
-                        ToolTipService.SetBetweenShowDelay(BtnResetView, BetweenShowDelay);
-                        BtnResetView.Content = "⊡";
-
-                        ToolTipService.SetInitialShowDelay(BtnHistory, InitialShowDelay);
-                        ToolTipService.SetShowDuration(BtnHistory, ShowDuration);
-                        ToolTipService.SetBetweenShowDelay(BtnHistory, BetweenShowDelay);
-                        BtnHistory.Content = "⏳";
-                    }
-                    break;
-            }
-
             InitHistory();
         }
 
@@ -215,7 +138,7 @@ namespace WebWeaver
             // Создать новую ноду
             if (e.Key == Key.Insert)
             {
-                BtnNewNode_Click(this, new RoutedEventArgs());
+                BtnNewNode();
                 e.Handled = true;
             }
 
@@ -225,36 +148,36 @@ namespace WebWeaver
                 switch (e.Key)
                 {
                     case Key.S: // Ctrl + S -> Сохранить
-                        BtnSave_Click(this, new RoutedEventArgs());
+                        BtnSave();
                         e.Handled = true;
                         break;
 
                     case Key.O: // Ctrl + O -> Открыть
-                        BtnOpen_Click(this, new RoutedEventArgs());
+                        BtnOpen();
                         e.Handled = true;
                         break;
 
                     case Key.F: // Ctrl + F -> Найти ноду
-                        BtnFindNode_Click(this, new RoutedEventArgs());
+                        BtnFindNode();
                         e.Handled = true;
                         break;
                     case Key.Delete: // Ctrl + Delete -> Очистить всё
-                        BtnClearAll_Click(this, new RoutedEventArgs());
+                        BtnClearAll();
                         e.Handled = true;
                         break;
 
                     case Key.OemPlus: // Ctrl + "+" -> Приблизить
-                        BtnZoomIn_Click(this, new RoutedEventArgs());
+                        ZoomAt(AppSettings.ZoomStep);
                         e.Handled = true;
                         break;
 
                     case Key.OemMinus: // Ctrl + "-" -> Отдалить
-                        BtnZoomOut_Click(this, new RoutedEventArgs());
+                        ZoomAt(-AppSettings.ZoomStep);
                         e.Handled = true;
                         break;
 
                     case Key.Home: // Ctrl + Home -> Сбросить вид
-                        BtnResetView_Click(this, new RoutedEventArgs());
+                        ResetView();
                         e.Handled = true;
                         break;
                 }
@@ -504,14 +427,6 @@ namespace WebWeaver
         {
             var model = new NodeModel { X = canvasPos.X, Y = canvasPos.Y };
             ShowInfoPanelForCreate(model);
-        }
-
-        private void BtnNewNode_Click(object s, RoutedEventArgs e)
-        {
-            // Создать в центре видимой области
-            double cx = (canvasBorder.ActualWidth / 2 - _offsetX) / _scale;
-            double cy = (canvasBorder.ActualHeight / 2 - _offsetY) / _scale;
-            CreateNode(new Point(cx, cy));
         }
 
         private void TextBlock_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -916,14 +831,6 @@ namespace WebWeaver
             PushHistory($"Переход к ноде: «{ctrl.Model.Name}»");
         }
 
-        private void ResetView()
-        {
-            _scale = 1.0;
-            _offsetX = 0;
-            _offsetY = 0;
-            ApplyTransform();
-        }
-
         // ═══════════════════════════════════════════════════════════════
         // БУФЕР ОБМЕНА
         // ═══════════════════════════════════════════════════════════════
@@ -1150,116 +1057,6 @@ namespace WebWeaver
                 e.Handled = true;
             }
         }
-
-        private void ZoomAt(double delta)
-        {
-            _scale = Math.Clamp(_scale + delta, AppSettings.ZoomMin, AppSettings.ZoomMax);
-            ApplyTransform();
-        }
-
-        // ═══════════════════════════════════════════════════════════════
-        // СОХРАНЕНИЕ / ЗАГРУЗКА
-        // ═══════════════════════════════════════════════════════════════
-        private void BtnSave_Click(object s, RoutedEventArgs e)
-        {
-            if (_currentFilePath != null)
-                SaveToPath(_currentFilePath);   // перезапись
-            else
-                SaveAs();
-        }
-
-        private void BtnSaveAs_Click(object s, RoutedEventArgs e) => SaveAs();
-
-        private void SaveAs()
-        {
-            var dlg = new SaveFileDialog
-            {
-                Title = "Сохранить карту",
-                Filter = "Карта узлов (*.wwmap)|*.wwmap|Все файлы|*.*",
-                DefaultExt = ".wwmap",
-                AddExtension = true
-            };
-            if (dlg.ShowDialog() != true) return;
-            SaveToPath(dlg.FileName);
-        }
-
-        private void SaveToPath(string path)
-        {
-            GoToRoot();
-
-            var json = System.Text.Json.JsonSerializer.Serialize(CurrentLevel.Map,
-                new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-            System.IO.File.WriteAllText(path, json);
-
-            _currentFilePath = path;
-            UpdateTitleBar();
-            SetStatus($"Сохранено: {System.IO.Path.GetFileName(path)}");
-        }
-
-        private void BtnOpen_Click(object s, RoutedEventArgs e)
-        {
-            var dlg = new OpenFileDialog
-            {
-                Title = "Открыть карту",
-                Filter = "Карты узлов (*.wwmap;*.gnmap)|*.wwmap;*.gnmap|Все файлы|*.*"
-            };
-            if (dlg.ShowDialog() == true)
-                OpenMapFromPath(dlg.FileName);
-        }
-
-        private void OpenMapFromPath(string path)
-        {
-            try
-            {
-                var json = System.IO.File.ReadAllText(path);
-                var map = System.Text.Json.JsonSerializer.Deserialize<MapData>(json);
-
-                if (map == null || map.Nodes.Count == 0)
-                {
-                    MessageBox.Show("Файл пуст или не является картой узлов.", "Ошибка",
-                        MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-
-                // 1. Сбрасываем стек уровней: загруженная карта становится корнем
-                _mapStack.Clear();
-                _mapStack.Add(new MapLevel { Map = map, Title = "Корень" });
-
-                // 2. Полностью очищаем полотно
-                ClearTempLine();
-                _connectSource = null;
-                DeselectAll();
-                HideInfoPanel();
-                ClearMap();
-
-                // 3. Загружаем ноды и связи
-                foreach (var model in map.Nodes)
-                    AddNodeControl(model);
-
-                _connections.AddRange(map.Connections);
-
-                // 4. Рисуем стрелки после того, как ноды получат реальные размеры
-                Dispatcher.InvokeAsync(() =>
-                {
-                    foreach (var conn in _connections.ToList())
-                        DrawArrow(conn);
-                }, System.Windows.Threading.DispatcherPriority.Loaded);
-
-                // 5. Обновляем интерфейс
-                _currentFilePath = path;
-                UpdateTitleBar();
-                ResetView();
-
-                SetStatus($"Открыто: {System.IO.Path.GetFileName(path)} ({map.Nodes.Count} нод)");
-                PushHistory($"Открыта карта: {System.IO.Path.GetFileName(path)}");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Не удалось открыть карту:\n{ex.Message}", "Ошибка",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
 
         // ═══════════════════════════════════════════════════════════════
         // КАРТЫ-УЗЛЫ: ВЛОЖЕННЫЕ КАРТЫ И НАВИГАЦИЯ
@@ -1524,66 +1321,7 @@ namespace WebWeaver
                 : "Interactive Whiteboard";
         }
 
-        private void BtnClearAll_Click(object s, RoutedEventArgs e)
-        {
-            var r = MessageBox.Show(
-                "Очистить всю карту? Несохранённые данные будут потеряны.",
-                "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (r == MessageBoxResult.Yes) ClearAll();
-        }
-
         // ── ПОИСК НОДЫ ────────────----────────────────────────────────
-        private void BtnFindNode_Click(object s, RoutedEventArgs e)
-        {
-            var win = new Window
-            {
-                Title = "Найти ноду",
-                Width = 360,
-                Height = 180,
-                Background = new SolidColorBrush(Color.FromRgb(32, 35, 43)),
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Owner = this,
-                ResizeMode = ResizeMode.NoResize
-            };
-            var sp = new StackPanel { Margin = new Thickness(16) };
-            var lbl = new TextBlock
-            {
-                Text = "Введите имя ноды:",
-                Foreground = Brushes.LightGray,
-                Margin = new Thickness(0, 0, 0, 6)
-            };
-            var tb = new TextBox
-            {
-                Background = new SolidColorBrush(Color.FromRgb(28, 30, 36)),
-                Foreground = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(60, 130, 200)),
-                Padding = new Thickness(6, 4, 6, 4)
-            };
-            var btn = new Button
-            {
-                Content = "Найти",
-                Margin = new Thickness(0, 8, 0, 0),
-                Background = new SolidColorBrush(Color.FromRgb(60, 130, 200)),
-                Foreground = Brushes.White,
-                BorderThickness = new Thickness(0),
-                Padding = new Thickness(12, 6, 12, 6)
-            };
-            btn.Click += (_, _) =>
-            {
-                var q = tb.Text.Trim().ToLower();
-                var ctrl = _nodes.FirstOrDefault(n => n.Model.Name.ToLower().Contains(q));
-                if (ctrl != null) { FocusNode(ctrl); win.Close(); }
-                else SetStatus($"Нода «{tb.Text}» не найдена.");
-            };
-            tb.KeyDown += (_, e2) => { if (e2.Key == Key.Enter) btn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); };
-            sp.Children.Add(lbl);
-            sp.Children.Add(tb);
-            sp.Children.Add(btn);
-            win.Content = sp;
-            win.ShowDialog();
-            tb.Focus();
-        }
-
         private void ClearMap()
         {
             ClearGroupSelection();
@@ -1613,130 +1351,6 @@ namespace WebWeaver
         // ═══════════════════════════════════════════════════════════════
         // ДЕРЕВО НОД (кто к кому принадлежит)
         // ═══════════════════════════════════════════════════════════════
-        private void BtnTree_Click(object s, RoutedEventArgs e) => ShowNodeTree();
-
-        private void ShowNodeTree()
-        {
-            SyncCurrentLevelFromCanvas();
-
-            var win = new Window
-            {
-                Title = "Дерево нод",
-                Width = 440,
-                Height = 540,
-                Background = new SolidColorBrush(Color.FromRgb(32, 35, 43)),
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Owner = this
-            };
-
-            var root = new DockPanel { Margin = new Thickness(10) };
-
-            // ── Текущий путь и кнопки навигации ──
-            var topSp = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
-            var lblPath = new TextBlock
-            {
-                Text = "Вы здесь: " + string.Join("  ›  ",
-                    _mapStack.Select((l, i) => i == 0 ? "🏠 Корень" : l.Title)),
-                Foreground = new SolidColorBrush(Color.FromRgb(255, 220, 50)),
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 0, 0, 8)
-            };
-
-            var btnRow = new StackPanel { Orientation = Orientation.Horizontal };
-            var btnUp = new Button
-            {
-                Content = "⬆ Уровень выше",
-                Padding = new Thickness(10, 4, 10, 4),
-                Margin = new Thickness(0, 0, 8, 0),
-                Background = new SolidColorBrush(Color.FromRgb(60, 130, 200)),
-                Foreground = Brushes.White,
-                BorderThickness = new Thickness(0)
-            };
-            btnUp.Click += (_, _) => { ExitMap(); /*win.Close();*/ };
-
-            var btnRoot = new Button
-            {
-                Content = "🏠 В корень",
-                Padding = new Thickness(10, 4, 10, 4),
-                Background = new SolidColorBrush(Color.FromRgb(60, 130, 200)),
-                Foreground = Brushes.White,
-                BorderThickness = new Thickness(0)
-            };
-            btnRoot.Click += (_, _) => { GoToRoot(); win.Close(); };
-
-            btnRow.Children.Add(btnUp);
-            btnRow.Children.Add(btnRoot);
-            topSp.Children.Add(lblPath);
-            topSp.Children.Add(btnRow);
-            DockPanel.SetDock(topSp, Dock.Top);
-            root.Children.Add(topSp);
-
-            var hint = new TextBlock
-            {
-                Text = "Двойной клик по 🗺 — перейти внутрь этой карты.",
-                Foreground = new SolidColorBrush(Color.FromRgb(120, 125, 140)),
-                Margin = new Thickness(0, 8, 0, 0)
-            };
-            DockPanel.SetDock(hint, Dock.Bottom);
-            root.Children.Add(hint);
-
-            // ── Само дерево ──
-            var tv = new TreeView { Background = Brushes.Transparent, BorderThickness = new Thickness(0) };
-
-            void Fill(TreeViewItem parent, MapData map, List<Guid> path)
-            {
-                foreach (var n in map.Nodes)
-                {
-                    if (n.EmbeddedMap != null)
-                    {
-                        var childPath = new List<Guid>(path) { n.Id };
-
-                        var header = new TextBlock
-                        {
-                            Text = "🗺 " + n.Name,
-                            Foreground = new SolidColorBrush(Color.FromRgb(90, 179, 255)),
-                            Cursor = Cursors.Hand
-                        };
-                        header.MouseLeftButtonDown += (_, e2) =>
-                        {
-                            if (e2.ClickCount == 2)
-                            {
-                                e2.Handled = true;
-                                NavigateByPath(childPath);
-                                win.Close();
-                            }
-                        };
-
-                        var item = new TreeViewItem { Header = header, Margin = new Thickness(0, 2, 0, 2) };
-                        Fill(item, n.EmbeddedMap, childPath);
-                        parent.Items.Add(item);
-                    }
-                    else
-                    {
-                        parent.Items.Add(new TreeViewItem
-                        {
-                            Header = new TextBlock
-                            {
-                                Text = "• " + n.Name,
-                                Foreground = new SolidColorBrush(Color.FromRgb(150, 155, 170))
-                            }
-                        });
-                    }
-                }
-            }
-
-            var rootItem = new TreeViewItem
-            {
-                Header = new TextBlock { Text = "🏠 Корень", Foreground = Brushes.White },
-                IsExpanded = true
-            };
-            Fill(rootItem, _mapStack[0].Map, new List<Guid>());
-            tv.Items.Add(rootItem);
-
-            root.Children.Add(tv);
-            win.Content = root;
-            win.ShowDialog();
-        }
 
         // Переход по цепочке: корень → карта → карта → …
         private void NavigateByPath(List<Guid> path)
@@ -1749,14 +1363,6 @@ namespace WebWeaver
                 EnterMap(ctrl);
             }
         }
-
-
-        // ═══════════════════════════════════════════════════════════════
-        // ЗУМИРОВАНИЕ (кнопки)
-        // ═══════════════════════════════════════════════════════════════
-        private void BtnZoomIn_Click(object s, RoutedEventArgs e) => ZoomAt(AppSettings.ZoomStep);
-        private void BtnZoomOut_Click(object s, RoutedEventArgs e) => ZoomAt(-AppSettings.ZoomStep);
-        private void BtnResetView_Click(object s, RoutedEventArgs e) => ResetView();
 
         // ═══════════════════════════════════════════════════════════════
         // СТАТУС-БАР
@@ -2154,56 +1760,6 @@ namespace WebWeaver
                 _restoring = false;
                 SetStatus("Не удалось восстановить состояние: " + ex.Message);
             }
-        }
-
-        private void BtnHistory_Click(object sender, RoutedEventArgs e)
-        {
-            var win = new Window
-            {
-                Title = "История операций",
-                Width = 360,
-                Height = 440,
-                Owner = this,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Background = new SolidColorBrush(Color.FromRgb(30, 33, 40))
-            };
-
-            var list = new ListBox
-            {
-                Background = Brushes.Transparent,
-                Foreground = Brushes.White,
-                BorderThickness = new Thickness(0),
-                Margin = new Thickness(8)
-            };
-
-            for (int i = _history.Count - 1; i >= 0; i--) // свежие сверху
-            {
-                int idx = i; // важно: захватываем копию, иначе лямбда увидит последнее i
-                var item = new ListBoxItem
-                {
-                    Content = (idx == _historyIndex ? "▸ " : idx > _historyIndex ? "↷ " : "") + _history[idx].Title,
-                    Tag = idx
-                };
-                if (idx > _historyIndex) item.Opacity = 0.45; // будущее — то, что можно повторить
-                if (idx == _historyIndex) item.Background = new SolidColorBrush(Color.FromRgb(60, 80, 120));
-                item.MouseDoubleClick += (_, _) => { JumpToHistory(idx); win.Close(); };
-                list.Items.Add(item);
-            }
-
-            var hint = new TextBlock
-            {
-                Text = "Двойной клик — перейти к этому состоянию",
-                Foreground = Brushes.Gray,
-                Margin = new Thickness(10, 6, 0, 6)
-            };
-
-            var root = new DockPanel();
-            DockPanel.SetDock(hint, Dock.Bottom);
-            root.Children.Add(hint);
-            root.Children.Add(list);
-
-            win.Content = root;
-            win.ShowDialog();
         }
 
         private void JumpToHistory(int index)
@@ -2661,6 +2217,599 @@ namespace WebWeaver
             _offsetY = H / 2 - (r.Y + r.Height / 2) * _scale;
             ApplyTransform(); // обновит translateT, сетку и стрелки
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Кнопки
+        // ═══════════════════════════════════════════════════════════════
+
+        private void BtnNewNode()
+        {
+            // Создать в центре видимой области
+            double cx = (canvasBorder.ActualWidth / 2 - _offsetX) / _scale;
+            double cy = (canvasBorder.ActualHeight / 2 - _offsetY) / _scale;
+            CreateNode(new Point(cx, cy));
+        }
+
+        private void BtnSave()
+        {
+            if (_currentFilePath != null)
+                SaveToPath(_currentFilePath);   // перезапись
+            else
+                SaveAs();
+        }
+
+        private void ShowNodeTree()
+        {
+            SyncCurrentLevelFromCanvas();
+
+            var win = new Window
+            {
+                Title = "Дерево нод",
+                Width = 440,
+                Height = 540,
+                Background = new SolidColorBrush(Color.FromRgb(32, 35, 43)),
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this
+            };
+
+            var root = new DockPanel { Margin = new Thickness(10) };
+
+            // ── Текущий путь и кнопки навигации ──
+            var topSp = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+            var lblPath = new TextBlock
+            {
+                Text = "Вы здесь: " + string.Join("  ›  ",
+                    _mapStack.Select((l, i) => i == 0 ? "🏠 Корень" : l.Title)),
+                Foreground = new SolidColorBrush(Color.FromRgb(255, 220, 50)),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+
+            var btnRow = new StackPanel { Orientation = Orientation.Horizontal };
+            var btnUp = new Button
+            {
+                Content = "⬆ Уровень выше",
+                Padding = new Thickness(10, 4, 10, 4),
+                Margin = new Thickness(0, 0, 8, 0),
+                Background = new SolidColorBrush(Color.FromRgb(60, 130, 200)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0)
+            };
+            btnUp.Click += (_, _) => { ExitMap(); /*win.Close();*/ };
+
+            var btnRoot = new Button
+            {
+                Content = "🏠 В корень",
+                Padding = new Thickness(10, 4, 10, 4),
+                Background = new SolidColorBrush(Color.FromRgb(60, 130, 200)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0)
+            };
+            btnRoot.Click += (_, _) => { GoToRoot(); win.Close(); };
+
+            btnRow.Children.Add(btnUp);
+            btnRow.Children.Add(btnRoot);
+            topSp.Children.Add(lblPath);
+            topSp.Children.Add(btnRow);
+            DockPanel.SetDock(topSp, Dock.Top);
+            root.Children.Add(topSp);
+
+            var hint = new TextBlock
+            {
+                Text = "Двойной клик по 🗺 — перейти внутрь этой карты.",
+                Foreground = new SolidColorBrush(Color.FromRgb(120, 125, 140)),
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+            DockPanel.SetDock(hint, Dock.Bottom);
+            root.Children.Add(hint);
+
+            // ── Само дерево ──
+            var tv = new TreeView { Background = Brushes.Transparent, BorderThickness = new Thickness(0) };
+
+            void Fill(TreeViewItem parent, MapData map, List<Guid> path)
+            {
+                foreach (var n in map.Nodes)
+                {
+                    if (n.EmbeddedMap != null)
+                    {
+                        var childPath = new List<Guid>(path) { n.Id };
+
+                        var header = new TextBlock
+                        {
+                            Text = "🗺 " + n.Name,
+                            Foreground = new SolidColorBrush(Color.FromRgb(90, 179, 255)),
+                            Cursor = Cursors.Hand
+                        };
+                        header.MouseLeftButtonDown += (_, e2) =>
+                        {
+                            if (e2.ClickCount == 2)
+                            {
+                                e2.Handled = true;
+                                NavigateByPath(childPath);
+                                win.Close();
+                            }
+                        };
+
+                        var item = new TreeViewItem { Header = header, Margin = new Thickness(0, 2, 0, 2) };
+                        Fill(item, n.EmbeddedMap, childPath);
+                        parent.Items.Add(item);
+                    }
+                    else
+                    {
+                        parent.Items.Add(new TreeViewItem
+                        {
+                            Header = new TextBlock
+                            {
+                                Text = "• " + n.Name,
+                                Foreground = new SolidColorBrush(Color.FromRgb(150, 155, 170))
+                            }
+                        });
+                    }
+                }
+            }
+
+            var rootItem = new TreeViewItem
+            {
+                Header = new TextBlock { Text = "🏠 Корень", Foreground = Brushes.White },
+                IsExpanded = true
+            };
+            Fill(rootItem, _mapStack[0].Map, new List<Guid>());
+            tv.Items.Add(rootItem);
+
+            root.Children.Add(tv);
+            win.Content = root;
+            win.ShowDialog();
+        }
+
+        private void BtnSaveAs_Click(object s, RoutedEventArgs e) => SaveAs();
+
+        private void SaveAs()
+        {
+            var dlg = new SaveFileDialog
+            {
+                Title = "Сохранить карту",
+                Filter = "Карта узлов (*.wwmap)|*.wwmap|Все файлы|*.*",
+                DefaultExt = ".wwmap",
+                AddExtension = true
+            };
+            if (dlg.ShowDialog() != true) return;
+            SaveToPath(dlg.FileName);
+        }
+
+        private void SaveToPath(string path)
+        {
+            GoToRoot();
+
+            var json = System.Text.Json.JsonSerializer.Serialize(CurrentLevel.Map,
+                new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            System.IO.File.WriteAllText(path, json);
+
+            _currentFilePath = path;
+            UpdateTitleBar();
+            SetStatus($"Сохранено: {System.IO.Path.GetFileName(path)}");
+        }
+
+        private void BtnOpen()
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title = "Открыть карту",
+                Filter = "Карты узлов (*.wwmap;*.gnmap)|*.wwmap;*.gnmap|Все файлы|*.*"
+            };
+            if (dlg.ShowDialog() == true)
+                OpenMapFromPath(dlg.FileName);
+        }
+
+        private void BtnHistory()
+        {
+            var win = new Window
+            {
+                Title = "История операций",
+                Width = 360,
+                Height = 440,
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = new SolidColorBrush(Color.FromRgb(30, 33, 40))
+            };
+
+            var list = new ListBox
+            {
+                Background = Brushes.Transparent,
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Margin = new Thickness(8)
+            };
+
+            for (int i = _history.Count - 1; i >= 0; i--) // свежие сверху
+            {
+                int idx = i; // важно: захватываем копию, иначе лямбда увидит последнее i
+                var item = new ListBoxItem
+                {
+                    Content = (idx == _historyIndex ? "▸ " : idx > _historyIndex ? "↷ " : "") + _history[idx].Title,
+                    Tag = idx
+                };
+                if (idx > _historyIndex) item.Opacity = 0.45; // будущее — то, что можно повторить
+                if (idx == _historyIndex) item.Background = new SolidColorBrush(Color.FromRgb(60, 80, 120));
+                item.MouseDoubleClick += (_, _) => { JumpToHistory(idx); win.Close(); };
+                list.Items.Add(item);
+            }
+
+            var hint = new TextBlock
+            {
+                Text = "Двойной клик — перейти к этому состоянию",
+                Foreground = Brushes.Gray,
+                Margin = new Thickness(10, 6, 0, 6)
+            };
+
+            var root = new DockPanel();
+            DockPanel.SetDock(hint, Dock.Bottom);
+            root.Children.Add(hint);
+            root.Children.Add(list);
+
+            win.Content = root;
+            win.ShowDialog();
+        }
+
+        private void BtnClearAll()
+        {
+            var r = MessageBox.Show(
+                "Очистить всю карту? Несохранённые данные будут потеряны.",
+                "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (r == MessageBoxResult.Yes) ClearAll();
+        }
+
+        private void BtnFindNode()
+        {
+            var win = new Window
+            {
+                Title = "Найти ноду",
+                Width = 360,
+                Height = 180,
+                Background = new SolidColorBrush(Color.FromRgb(32, 35, 43)),
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ResizeMode = ResizeMode.NoResize
+            };
+            var sp = new StackPanel { Margin = new Thickness(16) };
+            var lbl = new TextBlock
+            {
+                Text = "Введите имя ноды:",
+                Foreground = Brushes.LightGray,
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+            var tb = new TextBox
+            {
+                Background = new SolidColorBrush(Color.FromRgb(28, 30, 36)),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(60, 130, 200)),
+                Padding = new Thickness(6, 4, 6, 4)
+            };
+            var btn = new Button
+            {
+                Content = "Найти",
+                Margin = new Thickness(0, 8, 0, 0),
+                Background = new SolidColorBrush(Color.FromRgb(60, 130, 200)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(12, 6, 12, 6)
+            };
+            btn.Click += (_, _) =>
+            {
+                var q = tb.Text.Trim().ToLower();
+                var ctrl = _nodes.FirstOrDefault(n => n.Model.Name.ToLower().Contains(q));
+                if (ctrl != null) { FocusNode(ctrl); win.Close(); }
+                else SetStatus($"Нода «{tb.Text}» не найдена.");
+            };
+            tb.KeyDown += (_, e2) => { if (e2.Key == Key.Enter) btn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); };
+            sp.Children.Add(lbl);
+            sp.Children.Add(tb);
+            sp.Children.Add(btn);
+            win.Content = sp;
+            win.ShowDialog();
+            tb.Focus();
+        }
+
+        private void ResetView()
+        {
+            _scale = 1.0;
+            _offsetX = 0;
+            _offsetY = 0;
+            ApplyTransform();
+        }
+
+        private void ShowSettings()
+        {
+            var win = new ControlPanelWindow("Настройки", new[]
+            {
+                // ── Строка 1: заголовок секции ──
+                "TextBlock|Внешний вид||sect.look|label|",
+
+                // ── Строка 2: список с подписью ──
+                "Combo|Шрифт|Шрифт текста нод|font.family|label|Segoe UI,*Arial,Consolas",
+
+                // ── Строка 3: список с описанием при наведении ──
+                "Combo|Тема|Цветовая схема интерфейса|theme.name|tooltip|*Тёмная,Светлая,Синяя",
+
+                // ── Строка 4: три элемента в одной строке ──
+                "Check|Сетка|Показывать точки сетки|grid.show|label|true;" +
+                "Slider|Плотность|Шаг сетки, px|grid.spacing|label|4,40,12;" +
+                "Toggle|Магнит|Привязка нод к сетке|grid.snap|tooltip|true",
+
+                // ── Строка 5: радиокнопки одной группы (общий id) ──
+                "Radio|Слева|Порт новых связей по умолчанию|port.side|label|ports;" +
+                "Radio|Справа| |port.side|label|ports",
+
+                // ── Строка 6: ввод + кнопки закрытия ──
+                "TextBox|Имя карты|Как назвать сохранение|map.name|label|Без имени;" +
+                "Button|Готово||btn.ok|label|close;" +
+                "Button|Отмена||btn.cancel|label|close"
+            });
+            win.Owner = this;
+            win.ShowDialog();
+
+            if (win.Results.ContainsKey("btn.ok") && win.Results.Count > 1)
+            {
+                MessageBox.Show("Ок, есть изменения");
+            }
+            else if (win.Results.ContainsKey("btn.cancel"))
+            {
+                MessageBox.Show("Ок, откатываю изменения");
+            }
+            else
+            {
+                MessageBox.Show("Мы просто вышли");
+            }
+        }
+
+        private void ZoomAt(double delta)
+        {
+            _scale = Math.Clamp(_scale + delta, AppSettings.ZoomMin, AppSettings.ZoomMax);
+            ApplyTransform();
+        }
+
+        private void OpenMapFromPath(string path)
+        {
+            try
+            {
+                var json = System.IO.File.ReadAllText(path);
+                var map = System.Text.Json.JsonSerializer.Deserialize<MapData>(json);
+
+                if (map == null || map.Nodes.Count == 0)
+                {
+                    MessageBox.Show("Файл пуст или не является картой узлов.", "Ошибка",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                // 1. Сбрасываем стек уровней: загруженная карта становится корнем
+                _mapStack.Clear();
+                _mapStack.Add(new MapLevel { Map = map, Title = "Корень" });
+
+                // 2. Полностью очищаем полотно
+                ClearTempLine();
+                _connectSource = null;
+                DeselectAll();
+                HideInfoPanel();
+                ClearMap();
+
+                // 3. Загружаем ноды и связи
+                foreach (var model in map.Nodes)
+                    AddNodeControl(model);
+
+                _connections.AddRange(map.Connections);
+
+                // 4. Рисуем стрелки после того, как ноды получат реальные размеры
+                Dispatcher.InvokeAsync(() =>
+                {
+                    foreach (var conn in _connections.ToList())
+                        DrawArrow(conn);
+                }, System.Windows.Threading.DispatcherPriority.Loaded);
+
+                // 5. Обновляем интерфейс
+                _currentFilePath = path;
+                UpdateTitleBar();
+                ResetView();
+
+                SetStatus($"Открыто: {System.IO.Path.GetFileName(path)} ({map.Nodes.Count} нод)");
+                PushHistory($"Открыта карта: {System.IO.Path.GetFileName(path)}");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Не удалось открыть карту:\n{ex.Message}", "Ошибка",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // ПАНЕЛЬ КНОПОК: заголовок + кнопки с описаниями
+        // Формат строки: "Название|Описание|id|True"
+        // ═══════════════════════════════════════════════════════════════
+
+        // Открытая панель кнопок + флаг «закрылась только что»
+        private Popup? _actionPopup;
+        private bool _actionPopupJustClosed;
+
+        private void ShowActionPanel(FrameworkElement anchor, string title, params string[] buttons)
+        {
+            var popup = new Popup
+            {
+                PlacementTarget = anchor,          // элемент, под которым появится панель
+                Placement = PlacementMode.Bottom,  // сразу ПОД ним, левый край по левому краю кнопки
+                StaysOpen = false,                 // закрытие по клику в любом другом месте окна
+                AllowsTransparency = true,
+                PopupAnimation = PopupAnimation.Fade
+            };
+            _actionPopup = popup;
+
+            // «Тоггл»: попап уже закрылся от этого клика — не открывать заново
+            popup.Closed += (_, _) =>
+            {
+                _actionPopupJustClosed = true;
+                Dispatcher.BeginInvoke(new Action(() => _actionPopupJustClosed = false),
+                    System.Windows.Threading.DispatcherPriority.Background);
+            };
+
+            var root = new Border
+            {
+                Background = new SolidColorBrush(Color.FromRgb(32, 35, 43)),  // #20232B
+                BorderBrush = new SolidColorBrush(Color.FromRgb(42, 45, 56)), // #2A2D38
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(12),
+                Width = 340
+            };
+
+            var stack = new StackPanel();
+
+            // ── Заголовок панели ──
+            stack.Children.Add(new TextBlock
+            {
+                Text = title,
+                FontSize = 15,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(Color.FromRgb(100, 180, 255)), // #64B4FF
+                Margin = new Thickness(2, 0, 0, 10)
+            });
+
+            // ── Кнопки: "Имя|Описание|id" или "Имя|Описание|id|True" ──
+            foreach (var raw in buttons)
+            {
+                string def = raw.TrimEnd();
+
+                // 4-е поле — флаг описания: "…|True" = описание только при наведении.
+                // "…|False" или отсутствие флага — описание под названием, как раньше.
+                bool asTooltip = false;
+                if (def.EndsWith("|True", StringComparison.OrdinalIgnoreCase))
+                {
+                    asTooltip = true;
+                    def = def.Substring(0, def.Length - 5);
+                }
+                else if (def.EndsWith("|False", StringComparison.OrdinalIgnoreCase))
+                {
+                    def = def.Substring(0, def.Length - 6);
+                }
+
+                var parts = def.Split(new[] { '|' }, 3); // описание может содержать '|'
+                if (parts.Length < 3) continue;          // строка не по формату — пропустить
+
+                string name = parts[0].Trim();
+                string desc = parts[1].Trim();
+                string id = parts[2].Trim();
+
+                var content = new StackPanel();
+                content.Children.Add(new TextBlock
+                {
+                    Text = name,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = Brushes.White
+                });
+
+                // Описание под названием: только не в режиме подсказки и не пустое.
+                // При пустом описании блок не создаётся — кнопка сжимается по высоте.
+                if (!asTooltip && desc.Length > 0)
+                {
+                    content.Children.Add(new TextBlock
+                    {
+                        Text = desc,
+                        FontSize = 11,
+                        TextWrapping = TextWrapping.Wrap,
+                        Foreground = new SolidColorBrush(Color.FromRgb(154, 160, 176)), // #9AA0B0
+                        Margin = new Thickness(0, 2, 0, 0)
+                    });
+                }
+
+                var btn = new Button
+                {
+                    Content = content,
+                    Tag = id,
+                    Margin = new Thickness(0, 0, 0, 8),
+                    HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                    Style = BuildActionPanelButtonStyle()
+                };
+
+                // Описание всплывает при наведении курсора
+                if (asTooltip && desc.Length > 0)
+                {
+                    btn.ToolTip = new ToolTip
+                    {
+                        Content = desc,
+                        Background = new SolidColorBrush(Color.FromRgb(42, 45, 56)),  // #2A2D38
+                        Foreground = Brushes.White,
+                        BorderBrush = new SolidColorBrush(Color.FromRgb(64, 68, 82)),
+                        Padding = new Thickness(8, 5, 8, 5),
+                        FontSize = 11,
+                        Placement = PlacementMode.Right, // сбоку от кнопки, не перекрывает её
+                        HorizontalOffset = 4
+                    };
+                }
+
+                btn.Click += (s, e) =>
+                {
+                    popup.IsOpen = false;
+                    ActionPanelButton_Click(s, e);
+                };
+                stack.Children.Add(btn);
+            }
+
+            root.Child = stack;
+            popup.Child = root;
+            popup.IsOpen = true;
+        }
+
+        private static Style BuildActionPanelButtonStyle()
+        {
+            var st = new Style(typeof(Button));
+            st.Setters.Add(new Setter(BackgroundProperty,
+                new SolidColorBrush(Color.FromRgb(35, 38, 48))));   // #232630
+            st.Setters.Add(new Setter(BorderBrushProperty,
+                new SolidColorBrush(Color.FromRgb(42, 45, 56))));   // #2A2D38 — как рамка тулбара
+            st.Setters.Add(new Setter(BorderThicknessProperty, new Thickness(1)));
+            st.Setters.Add(new Setter(PaddingProperty, new Thickness(10, 8, 10, 8)));
+            st.Setters.Add(new Setter(CursorProperty, Cursors.Hand));
+            st.Setters.Add(new Setter(HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+
+            var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
+            hover.Setters.Add(new Setter(BackgroundProperty,
+                new SolidColorBrush(Color.FromRgb(48, 54, 70))));   // #303646 — подсветка при наведении
+            st.Triggers.Add(hover);
+
+            return st;
+        }
+
+        private void ActionPanelButton_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.Tag is not string id) return;
+
+            switch (id)
+            {
+                case "BtnNewNode": BtnNewNode(); break;
+                case "BtnSave": BtnSave(); break;
+                case "BtnOpen": BtnOpen(); break;
+                case "ShowNodeTree": ShowNodeTree(); break;
+
+                case "BtnHistory": BtnHistory(); break;
+                case "BtnClearAll": BtnClearAll(); break;
+                case "BtnFindNode": BtnFindNode(); break;
+                case "BtnSettings": ShowSettings(); break;
+
+                case "BtnResetView": ResetView(); break;
+                case "BtnZoomIn": ZoomAt(AppSettings.ZoomStep); break;
+                case "BtnZoomOut": ZoomAt(-AppSettings.ZoomStep); break;
+
+                default:
+                    SetStatus($"Нажата кнопка панели: {id}");
+                    break;
+            }
+        }
+
+        private void ButtonPanel(object s, RoutedEventArgs e)
+        {
+            if (_actionPopupJustClosed) { _actionPopupJustClosed = false; return; } // это был клик по уже открытой панели
+            var btn = s as FrameworkElement;
+            var data = BtnModel.GetData(btn);
+
+            ShowActionPanel(btn, data.Title, data.Button);
+        }
     }
 
     public static class ButtonAnimator
@@ -2668,37 +2817,37 @@ namespace WebWeaver
         private const int DelayMs = 30; // скорость появления/исчезания букв
 
         public static void Attach(Button btn, string emoji, string fullText)
-        {
-            btn.Content = emoji;
-            int runId = 0;
-
-            async void TypeIn(int id)
             {
-                for (int i = 1; i <= fullText.Length; i++)
+                btn.Content = emoji;
+                int runId = 0;
+
+                async void TypeIn(int id)
                 {
-                    if (id != runId) return;
-                    btn.Content = fullText.Substring(0, i);
-                    await Task.Delay(DelayMs);
+                    for (int i = 1; i <= fullText.Length; i++)
+                    {
+                        if (id != runId) return;
+                        btn.Content = fullText.Substring(0, i);
+                        await Task.Delay(DelayMs);
+                    }
                 }
-            }
 
-            async void TypeOut(int id)
-            {
-                for (int i = (btn.Content as string ?? "").Length - 1; i >= 0; i--)
+                async void TypeOut(int id)
                 {
-                    if (id != runId) return;
-                    btn.Content = fullText.Substring(0, i); // буквы исчезают с конца
-                    await Task.Delay(DelayMs);
+                    for (int i = (btn.Content as string ?? "").Length - 1; i >= 0; i--)
+                    {
+                        if (id != runId) return;
+                        btn.Content = fullText.Substring(0, i); // буквы исчезают с конца
+                        await Task.Delay(DelayMs);
+                    }
+                    if (id == runId) btn.Content = emoji; // текст стёрся — возвращаем эмодзи
                 }
-                if (id == runId) btn.Content = emoji; // текст стёрся — возвращаем эмодзи
-            }
 
-            btn.MouseEnter += (_, _) => TypeIn(++runId);
-            btn.MouseLeave += (_, _) =>
-            {
-                if (btn.Content as string == emoji) return; // анимировать нечего
-                TypeOut(++runId);
-            };
-        }
+                btn.MouseEnter += (_, _) => TypeIn(++runId);
+                btn.MouseLeave += (_, _) =>
+                {
+                    if (btn.Content as string == emoji) return; // анимировать нечего
+                    TypeOut(++runId);
+                };
+            }
     }
 }
