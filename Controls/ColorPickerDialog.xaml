@@ -3,7 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Выбрать цвет" Width="400" Height="350"
         WindowStartupLocation="CenterOwner"
-        Background="#1C1E24" Foreground="White"
+        Background="{DynamicResource Brush.PanelBg}"
+        Foreground="{DynamicResource Brush.TextBoxFg}"
         ResizeMode="NoResize" ShowInTaskbar="False">
 
     <Grid Margin="12">
@@ -16,11 +17,10 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Заголовок -->
         <TextBlock Grid.Row="0" Text="Выбрать цвет или ввести hex код"
-                   FontSize="12" Foreground="#CCCCCC" Margin="0,0,0,12"/>
+                   FontSize="12" Foreground="{DynamicResource Brush.LabelFg}" Margin="0,0,0,12"/>
 
-        <!-- Недавние цвета -->
+        <!-- Недавние цвета: в шаблоне поменялся только BorderBrush -->
         <ItemsControl Grid.Row="1" x:Name="recentColorsGrid" Margin="0,0,0,8">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
@@ -31,36 +31,38 @@
                 <DataTemplate>
                     <Border Width="24" Height="24" Margin="4"
                             Background="{Binding HexCode}"
-                            BorderBrush="#555" BorderThickness="1"
-                            Cursor="Hand"
-                            ToolTip="{Binding HexCode}"
+                            BorderBrush="{DynamicResource Brush.BtnBorder}" BorderThickness="1"
+                            Cursor="Hand" ToolTip="{Binding HexCode}"
                             MouseLeftButtonDown="RecentColor_MouseLeftButtonDown"
                             Tag="{Binding HexCode}"/>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- Hex код ввода -->
+        <!-- Hex -->
         <Grid Grid.Row="2" Margin="0,0,0,8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="60"/>
             </Grid.ColumnDefinitions>
-
-            <TextBlock Grid.Column="0" Text="Hex:" Foreground="#AAAAAA" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <TextBlock Grid.Column="0" Text="Hex:"
+                       Foreground="{DynamicResource Brush.LabelFg}"
+                       VerticalAlignment="Center" Margin="0,0,8,0"/>
             <TextBox x:Name="txHexCode" Grid.Column="1"
-                     Background="#282C34" Foreground="White"
-                     BorderBrush="#3C82C8" BorderThickness="1"
+                     Background="{DynamicResource Brush.TextBoxBg}"
+                     Foreground="{DynamicResource Brush.TextBoxFg}"
+                     CaretBrush="{DynamicResource Brush.TextBoxFg}"
+                     BorderBrush="{DynamicResource Brush.AccentBtn}" BorderThickness="1"
                      Padding="8,6" VerticalAlignment="Center"
                      TextChanged="TxHexCode_TextChanged"/>
             <Border x:Name="prevColor" Grid.Column="2"
                     Background="White"
-                    BorderBrush="#555" BorderThickness="1"
+                    BorderBrush="{DynamicResource Brush.BtnBorder}" BorderThickness="1"
                     Margin="8,0,0,0"/>
         </Grid>
 
-        <!-- Палитра цветов -->
+        <!-- Палитра: в шаблоне тоже BorderBrush -->
         <ItemsControl Grid.Row="3" x:Name="colorGrid" Margin="0,0,0,12">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
@@ -71,26 +73,26 @@
                 <DataTemplate>
                     <Border Width="32" Height="32" Margin="4"
                             Background="{Binding HexCode}"
-                            BorderBrush="#555" BorderThickness="1"
-                            Cursor="Hand"
-                            ToolTip="{Binding HexCode}"
+                            BorderBrush="{DynamicResource Brush.BtnBorder}" BorderThickness="1"
+                            Cursor="Hand" ToolTip="{Binding HexCode}"
                             MouseLeftButtonDown="ColorBorder_MouseLeftButtonDown"
                             Tag="{Binding HexCode}"/>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- Разделитель -->
-        <Separator Grid.Row="3" Background="#2A2D38" Margin="0,0,0,12"/>
+        <Separator Grid.Row="3" Background="{DynamicResource Brush.BtnBorder}" Margin="0,0,0,12"/>
 
-        <!-- Кнопки -->
         <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button x:Name="btnCancel" Content="Отмена" Width="80" Height="32"
-                    Background="#444" Foreground="White" BorderThickness="0"
-                    Margin="0,0,8,0" Click="BtnCancel_Click" Cursor="Hand"/>
+                    Background="{DynamicResource Brush.BtnBg}"
+                    Foreground="{DynamicResource Brush.BtnText}"
+                    BorderThickness="0" Margin="0,0,8,0"
+                    Click="BtnCancel_Click" Cursor="Hand"/>
             <Button x:Name="btnOk" Content="✓ OK" Width="80" Height="32"
-                    Background="#3C82C8" Foreground="White" BorderThickness="0"
-                    Click="BtnOk_Click" Cursor="Hand"/>
+                    Background="{DynamicResource Brush.AccentBtn}"
+                    Foreground="{DynamicResource Brush.BtnText}"
+                    BorderThickness="0" Click="BtnOk_Click" Cursor="Hand"/>
         </StackPanel>
     </Grid>
 </Window>
