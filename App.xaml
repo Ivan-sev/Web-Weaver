@@ -4,24 +4,40 @@
              StartupUri="MainWindow.xaml">
     <Application.Resources>
 
+        <!-- Дефолтные (тёмные) значения. При старте и смене темы
+             перезаписываются SettingsManager.ApplyTheme() -->
+        <SolidColorBrush x:Key="Brush.WindowBg"       Color="#1C1E24"/>
+        <SolidColorBrush x:Key="Brush.ToolbarBg"      Color="#16181F"/>
+        <SolidColorBrush x:Key="Brush.ToolbarBorder"  Color="#2A2D38"/>
+        <SolidColorBrush x:Key="Brush.PanelBg"        Color="#20232B"/>
+        <SolidColorBrush x:Key="Brush.PanelBorder"    Color="#3C82C8"/>
+        <SolidColorBrush x:Key="Brush.BtnBg"          Color="#232630"/>
+        <SolidColorBrush x:Key="Brush.BtnHover"       Color="#303646"/>
+        <SolidColorBrush x:Key="Brush.BtnBorder"      Color="#2A2D38"/>
+        <SolidColorBrush x:Key="Brush.BtnText"        Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="Brush.Accent"         Color="#64B4FF"/>
+        <SolidColorBrush x:Key="Brush.AccentBtn"      Color="#3C82C8"/>
+        <SolidColorBrush x:Key="Brush.TextBoxBg"      Color="#1C1E24"/>
+        <SolidColorBrush x:Key="Brush.TextBoxFg"      Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="Brush.LabelFg"        Color="#CCCCCC"/>
+        <SolidColorBrush x:Key="Brush.DescFg"         Color="#9AA0B0"/>
+        <SolidColorBrush x:Key="Brush.StatusFg"       Color="#606880"/>
+        <SolidColorBrush x:Key="Brush.ZoomFg"         Color="#A0C0E0"/>
+        <SolidColorBrush x:Key="Brush.CanvasBg"       Color="#1C1E24"/>
+        <SolidColorBrush x:Key="Brush.GridDot"        Color="#373A44"/>
+        <SolidColorBrush x:Key="Brush.NodePort"       Color="#3C82C8"/>
+        <SolidColorBrush x:Key="Brush.NodePortStroke" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="Brush.NodeBorder"     Color="#50A0F0"/>
+        
         <!-- Базовый TextBox -->
         <Style x:Key="FieldBox" TargetType="TextBox">
-            <Setter Property="Background"   Value="#1C1E24"/>
-            <Setter Property="Foreground"   Value="#DCDCDC"/>
-            <Setter Property="BorderBrush"  Value="#3C82C8"/>
+            <Setter Property="Background"   Value="{DynamicResource Brush.TextBoxBg}"/>
+            <Setter Property="Foreground"   Value="{DynamicResource Brush.TextBoxFg}"/>
+            <Setter Property="BorderBrush"  Value="{DynamicResource Brush.AccentBtn}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding"      Value="6,4"/>
             <Setter Property="FontSize"     Value="12"/>
-            <Setter Property="CaretBrush"   Value="White"/>
-        </Style>
-
-        <!-- ComboBox -->
-        <Style x:Key="ComboField" TargetType="ComboBox">
-            <Setter Property="Background"   Value="#1C1E24"/>
-            <Setter Property="Foreground"   Value="#DCDCDC"/>
-            <Setter Property="BorderBrush"  Value="#3C82C8"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="FontSize"     Value="12"/>
+            <Setter Property="CaretBrush"   Value="{DynamicResource Brush.TextBoxFg}"/>
         </Style>
 
         <!-- Кнопка действия -->
