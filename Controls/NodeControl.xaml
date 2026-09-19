@@ -6,7 +6,7 @@
             CornerRadius="8"
             BorderThickness="1.5"
             Background="#282C34"
-            BorderBrush="#3C82C8">
+            BorderBrush="{DynamicResource Brush.NodeBorder}">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -56,7 +56,7 @@
             <!-- Правый порт -->
             <Ellipse x:Name="portRight"
                      Width="14" Height="14"
-                     Fill="#3C82C8" Stroke="White" StrokeThickness="1.5"
+                     Fill="{DynamicResource Brush.NodePort}" Stroke="{DynamicResource Brush.NodePortStroke}" StrokeThickness="1.5"
                      HorizontalAlignment="Right" VerticalAlignment="Center"
                      Margin="0,0,-7,0" Grid.RowSpan="2"
                      Cursor="Cross"
@@ -65,7 +65,7 @@
             <!-- Левый порт -->
             <Ellipse x:Name="portLeft"
                      Width="14" Height="14"
-                     Fill="#3C82C8" Stroke="White" StrokeThickness="1.5"
+                     Fill="{DynamicResource Brush.NodePort}" Stroke="{DynamicResource Brush.NodePortStroke}" StrokeThickness="1.5"
                      HorizontalAlignment="Left" VerticalAlignment="Center"
                      Margin="-7,0,0,0" Grid.RowSpan="2"
                      Cursor="Cross"
