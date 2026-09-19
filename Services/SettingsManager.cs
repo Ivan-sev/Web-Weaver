@@ -1,5 +1,7 @@
 ﻿using System;
 using System.IO;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Media;
 using WebWeaver.Models;
@@ -52,9 +54,15 @@ namespace WebWeaver.Services
 
         public static void Save()
         {
+            // Настраиваем опции сериализации
+            var options = new JsonSerializerOptions
+            {
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                WriteIndented = true // по желанию, для красивого форматирования
+            };
+
             File.WriteAllText(FilePath,
-                System.Text.Json.JsonSerializer.Serialize(Settings,
-                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                System.Text.Json.JsonSerializer.Serialize(Settings, options));
             Saved?.Invoke();
         }
 
