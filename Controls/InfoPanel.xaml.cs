@@ -266,23 +266,14 @@ public partial class InfoPanel : UserControl
         };
         cbFont.Items.Clear();
         foreach (var f in fonts)
-        {
             cbFont.Items.Add(new ComboBoxItem
             {
                 Content = f,
                 FontFamily = new FontFamily(f),
-                // Явный белый цвет — чтобы текст не был бледным
-                Foreground = Brushes.White,
-                Background = new SolidColorBrush(Color.FromRgb(28, 30, 36)),
                 FontSize = 14
+                // Foreground/Background убрать — придут из стилей
             });
-        }
         if (cbFont.Items.Count > 0) cbFont.SelectedIndex = 0;
-
-        // Принудительный стиль ComboBox
-        cbFont.Background = new SolidColorBrush(Color.FromRgb(28, 30, 36));
-        cbFont.Foreground = Brushes.White;
-        cbFont.BorderBrush = new SolidColorBrush(Color.FromRgb(60, 130, 200));
     }
 
     // ── Превью цветов ────────────────────────────────────────────
