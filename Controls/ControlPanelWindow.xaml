@@ -7,40 +7,137 @@
         MaxHeight="700"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        Background="#20232B">
+        Background="{DynamicResource Brush.PanelBg}">
 
     <Window.Resources>
-        <!-- Неявный стиль: все кнопки панели автоматически получают его -->
         <Style TargetType="Button">
-            <Setter Property="Background" Value="#232630"/>
-            <Setter Property="BorderBrush" Value="#2A2D38"/>
+            <Setter Property="Background" Value="{DynamicResource Brush.BtnBg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.BtnBorder}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Padding" Value="10,6,10,6"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.BtnText}"/>
+            <Setter Property="Padding" Value="10,6"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#303646"/>
+                    <Setter Property="Background" Value="{DynamicResource Brush.BtnHover}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <Style TargetType="TextBox">
-            <Setter Property="Background" Value="#1C1E24"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="#3C82C8"/>
-            <Setter Property="Padding" Value="6,4,6,4"/>
+            <Setter Property="Background" Value="{DynamicResource Brush.TextBoxBg}"/>
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextBoxFg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentBtn}"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource Brush.TextBoxFg}"/>
+        </Style>
+
+        <!-- То, чего не было: комбо и его элементы -->
+        <Style TargetType="ComboBox">
+            <Setter Property="Background"  Value="{DynamicResource Brush.TextBoxBg}"/>
+            <Setter Property="Foreground"  Value="{DynamicResource Brush.TextBoxFg}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentBtn}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <!-- 1. Видимое «лицо» -->
+                            <Border x:Name="Bd" CornerRadius="4"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"/>
+
+                            <!-- 2. Текст выбранного элемента и стрелка — клики не перехватывают -->
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                      HorizontalAlignment="Left" VerticalAlignment="Center"
+                                      Content="{TemplateBinding SelectionBoxItem}"
+                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                      ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                      TextElement.Foreground="{TemplateBinding Foreground}"
+                                      IsHitTestVisible="False"/>
+
+                            <Path IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Center"
+                          Margin="0,0,8,0" Data="M0,0 L4,4 8,0"
+                          Stroke="{TemplateBinding Foreground}" StrokeThickness="1.5"/>
+
+                            <!-- 3. Невидимая кнопка — ВЕРХНИЙ слой, ловит все клики -->
+                            <ToggleButton Focusable="False" ClickMode="Press"
+                                  IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent"/>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+
+                            <!-- 4. Выпадающий список -->
+                            <Popup x:Name="PART_Popup"
+                           IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                           AllowsTransparency="True" Placement="Bottom" PopupAnimation="Slide"
+                           MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                <Border Background="{DynamicResource Brush.PanelBg}"
+                                BorderBrush="{DynamicResource Brush.BtnBorder}"
+                                BorderThickness="1" CornerRadius="4" Margin="0,2,0,0"
+                                MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                                    <ScrollViewer>
+                                        <ItemsPresenter/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsDropDownOpen" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Brush.Accent}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.TextBoxFg}"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Bd" CornerRadius="3" Background="Transparent"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Brush.AccentBtn}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource Brush.BtnText}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
-    <StackPanel Margin="14">
-        <TextBlock x:Name="tbTitle"
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- заголовок -->
+            <RowDefinition Height="*"/>
+            <!-- строки; * = «всё оставшееся место» -->
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="tbTitle" Grid.Row="0"
                    FontSize="15" FontWeight="Bold"
-                   Foreground="#64B4FF"
+                   Foreground="{DynamicResource Brush.Accent}"
                    Margin="2,0,0,12"/>
 
-        <!-- Строки панели добавляются сюда из кода -->
-        <StackPanel x:Name="spRows"/>
-    </StackPanel>
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="spRows"/>
+        </ScrollViewer>
+    </Grid>
 </Window>
