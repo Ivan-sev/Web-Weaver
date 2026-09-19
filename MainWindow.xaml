@@ -8,7 +8,7 @@
         MinWidth="800" MinHeight="500"
         WindowState="Maximized"
         WindowStyle="SingleBorderWindow"
-        Background="#1C1E24">
+        Background="{DynamicResource Brush.WindowBg}">
 
     <Window.InputBindings>
         <KeyBinding Key="S" Modifiers="Ctrl" Command="{Binding SaveCommand}"/>
@@ -23,37 +23,62 @@
         </Grid.RowDefinitions>
 
         <!-- ══ Верхняя панель инструментов ══ -->
-        <Border Grid.Row="0" Background="#16181F" BorderBrush="#2A2D38"
+        <Border Grid.Row="0" Background="{DynamicResource Brush.ToolbarBg}" 
+                BorderBrush="{DynamicResource Brush.ToolbarBorder}"
                 BorderThickness="0,0,0,1">
             <DockPanel Margin="6,0" LastChildFill="False">
 
                 <TextBlock x:Name="tbSettings" DockPanel.Dock="Left"
                         Text="🕸" ToolTip="Настройки (но еще не работает)"
-                        Foreground="#64B4FF" FontSize="14" FontWeight="Bold"
+                        Foreground="{DynamicResource Brush.Accent}" FontSize="14" FontWeight="Bold"
                         VerticalAlignment="Center" Margin="4,0,10,0"
                         MouseLeftButtonDown="TextBlock_MouseLeftButtonDown"/>
 
-                <Button x:Name="File" DockPanel.Dock="Left" Content="Файл"
+                <Button x:Name="bt1" DockPanel.Dock="Left" Content=""
                         Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
                         Click="ButtonPanel"/>
 
-                <Button x:Name="Tools" DockPanel.Dock="Left" Content="Инструменты"
+                <Button x:Name="bt2" DockPanel.Dock="Left" Content=""
                         Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
                         Click="ButtonPanel"/>
 
-                <Button x:Name="View" DockPanel.Dock="Left" Content="Вид"
+                <Button x:Name="bt3" DockPanel.Dock="Left" Content=""
+                        Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
+                        Click="ButtonPanel"/>
+
+                <Button x:Name="bt4" DockPanel.Dock="Left" Content=""
+                        Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
+                        Click="ButtonPanel"/>
+
+                <Button x:Name="bt5" DockPanel.Dock="Left" Content=""
+                        Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
+                        Click="ButtonPanel"/>
+
+                <Button x:Name="bt6" DockPanel.Dock="Left" Content=""
+                        Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
+                        Click="ButtonPanel"/>
+
+                <Button x:Name="bt7" DockPanel.Dock="Left" Content=""
+                        Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
+                        Click="ButtonPanel"/>
+
+                <Button x:Name="bt8" DockPanel.Dock="Left" Content=""
+                        Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
+                        Click="ButtonPanel"/>
+
+                <Button x:Name="bt9" DockPanel.Dock="Left" Content=""
                         Style="{StaticResource ActionBtn}" Margin="0,0,6,0"
                         Click="ButtonPanel"/>
 
                 <!--<Separator DockPanel.Dock="Left" Background="#2A2D38" Width="1" Margin="4,4"/>-->
 
                 <TextBlock x:Name="tbZoom" DockPanel.Dock="Right"
-                           Foreground="#A0C0E0" FontSize="11"
+                           Foreground="{DynamicResource Brush.ZoomFg}" FontSize="11"
                            VerticalAlignment="Center" Margin="8,0,0,0"
                            Text="100%"/>
 
                 <TextBlock x:Name="tbStatus" DockPanel.Dock="Right"
-                           Foreground="#606880" FontSize="10"
+                           Foreground="{DynamicResource Brush.StatusFg}" FontSize="10"
                            VerticalAlignment="Center" Margin="0,0,8,0"
                            Text="Готово"/>
             </DockPanel>
@@ -64,6 +89,9 @@
 
             <!-- Карта (Canvas в скролле) -->
             <Border x:Name="canvasBorder"
+                    AllowDrop="True"
+                    DragOver="CanvasBorder_DragOver"
+                    Drop="CanvasBorder_Drop"
                     Background="Transparent"
                     ClipToBounds="True"
                     MouseLeftButtonDown ="CanvasBorder_MouseLeftButtonDown"
