@@ -257,6 +257,25 @@ public static class AppSettings
 
 ---
 
+### ⌨️ Горячие клавиши
+| Название функции | Комбинации клавиш | описание |
+|---------|----------|----------|
+| `BtnNewNode` | Insert | Создать новую ноду |
+| `AddNodeFromMapFile` | - | Добавить ноду из карты (.wwmap) |
+| `BtnSave` | Ctrl+S | Сохранить карту |
+| `BtnSaveAs` | Ctrl+Shift+S | Сохранить карту как |
+| `BtnOpen` | Ctrl+O | Открыть карту |
+| `ShowNodeTree` | - | Дерево нод: кто к кому принадлежит |
+| `BtnHistory` | - | История изменени |
+| `BtnClearAlll` | Ctrl+Del | Очистить всё |
+| `BtnFindNode` | Ctrl+F | Поиск нод в проекте |
+| `BtnSettings` | - | Настройки приложения |
+| `BtnResetView` | Ctrl+Home | Сбросить масштаб и положение |
+| `BtnZoomIn` | Ctrl+ | Приблизить |
+| `BtnZoomOut` | Ctrl- | Отдалить |
+
+---
+
 ## 🔧 Разработка | Development
 
 ### Требования для разработчиков
