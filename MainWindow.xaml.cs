@@ -1,9 +1,4 @@
 ﻿using Microsoft.Win32;
-using System;
-using System.Collections.Generic;
-using System.Drawing.Drawing2D;
-using System.Linq;
-using System.Reflection.PortableExecutable;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -11,11 +6,10 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
-using System.Xml;
-using System.Xml.Linq;
 using WebWeaver.Controls;
 using WebWeaver.Models;
 using WebWeaver.Services;
+using static WebWeaver.Models.SettingsData;
 
 namespace WebWeaver
 {
@@ -59,7 +53,9 @@ namespace WebWeaver
 
         public MainWindow()
         {
-            SettingsManager.Load();            
+            WebWeaver.Language.LoadLangList();
+            SettingsManager.Load();
+            WebWeaver.Language.Set(SettingsManager.Settings.Language);
 
             // ВАЖНО: до InitializeComponent
             _gridHost = new VisualHost(_gridVisual);
@@ -93,7 +89,7 @@ namespace WebWeaver
             };
 
             // Карты-узлы: начальный уровень + верхняя панель навигации
-            _mapStack.Add(new MapLevel { Map = new MapData(), Title = "Корень" });
+            _mapStack.Add(new MapLevel { Map = new MapData(), Title = Lang.MapRootTitle });
 
             InitHistory();
         }
@@ -117,7 +113,7 @@ namespace WebWeaver
         {
             ApplyTransform();
             RedrawGrid();
-            SetStatus("Готово. ПКМ по карте — создать ноду.");
+            SetStatus(Lang.StatusReadyHint);
 
             // Аргумент командной строки
             var args = Environment.GetCommandLineArgs();
@@ -135,7 +131,7 @@ namespace WebWeaver
                 {
                     _connectSource = null;
                     ClearTempLine(); // если метод называется так
-                    SetStatus("Соединение отменено.");
+                    SetStatus(Lang.StatusConnectionCancelled);
                     e.Handled = true;
                     return;
                 }
@@ -154,6 +150,18 @@ namespace WebWeaver
             {
                 BtnNewNode();
                 e.Handled = true;
+            }
+
+            // Вернутся к родительскому элементу
+            if (e.Key == Key.PageUp)
+            {
+                ExitMap();
+            }
+
+            // Вернутся корень
+            if (e.Key == Key.Home)
+            {
+                GoToRoot();
             }
 
             // Горячие клавиши с Ctrl
@@ -353,7 +361,9 @@ namespace WebWeaver
                 Cursor = Cursors.Arrow;
             }
 
-            PushHistory(_groupSelection.Count > 1 ? $"Перемещение нод ({_groupSelection.Count})" : "Перемещение ноды");
+            PushHistory(_groupSelection.Count > 1
+                ? Lang.HistoryNodesMoved.Replace("{&}", _groupSelection.Count.ToString())
+                : Lang.HistoryNodeMoved);
         }
 
         private void MainCanvas_MouseMove(object s, MouseEventArgs e)
@@ -419,13 +429,14 @@ namespace WebWeaver
         private void AddNodeControl(NodeModel model)
         {
             // Не даем стакаться в одном месте ноды
-            SyncCurrentLevelFromCanvas();
+            //SyncCurrentLevelFromCanvas();
+            CurrentLevel.Map.Nodes = _nodes.Select(n => n.Model).ToList();
             if (CurrentLevel.Map.Nodes != null)
             {
                 foreach (var item in CurrentLevel.Map.Nodes)
                 {
-                    if ((item.X - model.X <= 10 || item.X - model.X >= -10) &&
-                        (item.Y - model.Y <= 10 || item.Y - model.Y >= -10)) 
+                    if (Math.Abs(item.X - model.X) <= 10 &&
+                        Math.Abs(item.Y - model.Y) <= 10)
                     { model.X += 20; model.Y += 20; }
                 }
             }            
@@ -484,13 +495,13 @@ namespace WebWeaver
 
             if (ctrl.Model.EmbeddedMap != null)
             {
-                var miOpenMap = new MenuItem { Header = "🗺 Открыть карту ноды" };
+                var miOpenMap = new MenuItem { Header = Lang.MouseNodeOpenMap };
                 miOpenMap.Click += (_, _) => EnterMap(ctrl);
                 cm.Items.Add(miOpenMap);
             }
             else
             {
-                var miMakeMap = new MenuItem { Header = "🗺 Сделать картой-узлом" };
+                var miMakeMap = new MenuItem { Header = Lang.MouseNodeSetHubMap };
                 miMakeMap.Click += (_, _) =>
                 {
                     ctrl.Model.EmbeddedMap = new MapData();
@@ -499,42 +510,42 @@ namespace WebWeaver
                 cm.Items.Add(miMakeMap);
             }
 
-            var miCompressBranch = new MenuItem { Header = "🗜 Сжать ветку в ноду" };
+            var miCompressBranch = new MenuItem { Header = Lang.MouseNodeCollapseNode };
             miCompressBranch.Click += (_, _) => CompressBranchIntoNode(ctrl);
             cm.Items.Add(miCompressBranch);
 
-            var miEdit = new MenuItem { Header = "✏️ Редактировать" };
+            var miEdit = new MenuItem { Header = Lang.MouseNodeEdit };
             miEdit.Click += (_, _) => ShowInfoPanelForEdit(ctrl.Model);
             cm.Items.Add(miEdit);
 
             if (ctrl.Model.EmbeddedMap == null)
             {
-                var miView = new MenuItem { Header = "📖 Открыть блокнот" };
+                var miView = new MenuItem { Header = Lang.MouseNodeOpenNotepad };
                 miView.Click += (_, _) => ShowInfoPanelForView(ctrl.Model);
                 cm.Items.Add(miView);
             }
 
-            var miDup = new MenuItem { Header = "📋 Дублировать" };
+            var miDup = new MenuItem { Header = Lang.MouseNodeDuplicate };
             miDup.Click += (_, _) => DuplicateNode(ctrl);
             cm.Items.Add(miDup);
 
-            var miConnect = new MenuItem { Header = "🔗 Начать соединение" };
+            var miConnect = new MenuItem { Header = Lang.MouseNodeStartConnection };
             miConnect.Click += (_, _) => StartConnection(ctrl);
             cm.Items.Add(miConnect);
 
-            var miDisconn = new MenuItem { Header = "✂️ Удалить все связи" };
+            var miDisconn = new MenuItem { Header = Lang.MouseNodeRemoveAllLinks };
             miDisconn.Click += (_, _) => RemoveAllConnections(ctrl);
             cm.Items.Add(miDisconn);
 
             cm.Items.Add(new Separator());
 
-            var miColor = new MenuItem { Header = "🎨 Быстро изменить цвет заголовка" };
+            var miColor = new MenuItem { Header = Lang.MouseNodeQuicklyChangeColor };
             miColor.Click += (_, _) => QuickColorPick(ctrl);
             cm.Items.Add(miColor);
 
             cm.Items.Add(new Separator());
 
-            var miDel = new MenuItem { Header = "🗑 Удалить ноду", Foreground = Brushes.Salmon };
+            var miDel = new MenuItem { Header = Lang.MouseNodeDeleteNode, Foreground = Brushes.Salmon };
             miDel.Click += (_, _) => DeleteNode(ctrl);
             cm.Items.Add(miDel);
 
@@ -557,8 +568,8 @@ namespace WebWeaver
                 n.Model.ConnectedTo.Remove(ctrl.Model.Id);
 
             if (_selectedNode == ctrl) _selectedNode = null;
-            SetStatus($"Нода «{ctrl.Model.Name}» удалена.");
-            PushHistory($"Нода удалена: «{ctrl.Model.Name}»");
+            SetStatus(Lang.StatusNodeDeleted.Replace("{&}", ctrl.Model.Name));
+            PushHistory(Lang.HistoryNodeDeleted.Replace("{&}", ctrl.Model.Name));
         }
 
         private void DuplicateNode(NodeControl ctrl)
@@ -572,7 +583,7 @@ namespace WebWeaver
 
             var m2 = new NodeModel
             {
-                Name = ctrl.Model.Name + " (копия)",
+                Name = ctrl.Model.Name + Lang.NodeCopySuffix,
                 Text = ctrl.Model.Text,
                 X = ctrl.Model.X + 30,
                 Y = ctrl.Model.Y + 30,
@@ -587,8 +598,8 @@ namespace WebWeaver
                 EmbeddedMap = mapCopy
             };
 
-            AddNodeControl(m2);
-            PushHistory($"Дублирование ноды «{m2.Name}»");
+            AddNodeControl(m2);            
+            PushHistory(Lang.HistoryNodeDuplicated.Replace("{&}", m2.Name));
         }
 
         private void QuickColorPick(NodeControl ctrl)
@@ -650,8 +661,8 @@ namespace WebWeaver
                 _arrows.Remove(arrow);
                 _connections.Remove(conn);
                 fromCtrl.Model.ConnectedTo.Remove(conn.ToNodeId);
-                PushHistory($"Связь удалена: «{fromCtrl.Model.Name}» → «{toCtrl.Model.Name}»");
-                SetStatus("Связь удалена (ПКМ по линии).");
+                PushHistory(Lang.HistoryLinkDeleted.Replace("{&}", fromCtrl.Model.Name).Replace("{*}", toCtrl.Model.Name));
+                SetStatus(Lang.StatusLinkRemoved);
                 e.Handled = true;
             };
 
@@ -681,8 +692,8 @@ namespace WebWeaver
                 .Where(c => c.FromNodeId == ctrl.Model.Id || c.ToNodeId == ctrl.Model.Id)
                 .ToList();
             foreach (var c in toRemove) RemoveConnection(c);
-            SetStatus($"Все связи ноды «{ctrl.Model.Name}» удалены.");
-            PushHistory($"Все связи ноды «{ctrl.Model.Name}» удалены.");
+            SetStatus(Lang.StatusAllLinksRemoved.Replace("{&}", ctrl.Model.Name));
+            PushHistory(Lang.HistoryAllLinksDeleted.Replace("{&}", ctrl.Model.Name));
         }
 
         private void RedrawArrows()
@@ -704,14 +715,14 @@ namespace WebWeaver
         {
             infoPanel.LoadForCreate(model);
             AnimateInfoPanel(show: true, large: false);
-            PushHistory("Создание ноды");
+            PushHistory(Lang.HistoryNodeCreated);
         }
 
         private void ShowInfoPanelForEdit(NodeModel model)
         {
             infoPanel.LoadForEdit(model);
             AnimateInfoPanel(show: true, large: false);
-            PushHistory($"Изменение ноды «{model.Name}»");
+            PushHistory(Lang.HistoryNodeEdited.Replace("{&}", model.Name));
         }
 
         private void ShowInfoPanelForView(NodeModel model)
@@ -770,15 +781,15 @@ namespace WebWeaver
             {
                 // Новая нода
                 AddNodeControl(model);
-                PushHistory("Создание ноды");
+                PushHistory(Lang.HistoryNodeCreated);
             }
             else
             {
                 // Обновить существующую
                 existing.Refresh();
                 RedrawArrows();
-                SetStatus($"Нода «{model.Name}» обновлена.");
-                PushHistory($"Нода обновлена: «{model.Name}»");
+                SetStatus(Lang.StatusNodeUpdated.Replace("{&}", model.Name));
+                PushHistory(Lang.HistoryNodeUpdated.Replace("{&}", model.Name));
             }
             HideInfoPanel();
         }
@@ -821,8 +832,8 @@ namespace WebWeaver
             _offsetY = cy - ctrl.Model.Y * _scale - (ctrl.Model.Height * _scale / 2);
             ApplyTransform();
             SelectNode(ctrl);
-            SetStatus($"Переход к ноде «{ctrl.Model.Name}».");
-            PushHistory($"Переход к ноде: «{ctrl.Model.Name}»");
+            SetStatus(Lang.StatusGoToNode.Replace("{&}", ctrl.Model.Name));
+            PushHistory(Lang.HistoryGoToNode.Replace("{&}", ctrl.Model.Name));
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -843,7 +854,7 @@ namespace WebWeaver
             if (_groupSelection.Count == 0 && _selectedNode != null)
                 AddToGroupSelection(_selectedNode);
 
-            if (_groupSelection.Count == 0) { SetStatus("Нет выделенных нод."); return; }
+            if (_groupSelection.Count == 0) { SetStatus(Lang.StatusNoSelection); return; }
 
             var ids = _groupSelection.Select(n => n.Model.Id).ToHashSet();
 
@@ -873,11 +884,11 @@ namespace WebWeaver
             {
                 int count = ids.Count;
                 DeleteSelectedGroup(); // сам пишет историю
-                SetStatus($"Вырезано нод: {count} — вставьте Ctrl+V.");
+                SetStatus(Lang.StatusCutNodes.Replace("{&}", count.ToString()));
             }
             else
             {
-                SetStatus($"Скопировано нод: {data.Nodes.Count} — вставьте Ctrl+V.");
+                SetStatus(Lang.StatusCopiedNodes.Replace("{&}", data.Nodes.Count.ToString()));
             }
         }
 
@@ -885,7 +896,7 @@ namespace WebWeaver
         {
             if (_clipboard == null || _clipboard.Nodes.Count == 0)
             {
-                SetStatus("Буфер обмена пуст.");
+                SetStatus(Lang.StatusClipboardEmpty);
                 return;
             }
 
@@ -957,8 +968,8 @@ namespace WebWeaver
             foreach (var ctrl in newCtrls) AddToGroupSelection(ctrl);
             SnapshotGroupPositions();
 
-            PushHistory($"Вставка нод ({data.Nodes.Count})");
-            SetStatus($"Вставлено нод: {data.Nodes.Count}");
+            PushHistory(Lang.HistoryNodesPasted.Replace("{&}", data.Nodes.Count.ToString()));
+            SetStatus(Lang.StatusPastedNodes.Replace("{&}", data.Nodes.Count.ToString()));
         }
 
 
@@ -971,7 +982,7 @@ namespace WebWeaver
             {
                 _connectSource = null;
                 ClearTempLine();
-                SetStatus("Соединение отменено.");
+                SetStatus(Lang.StatusConnectionCancelled);
                 e.Handled = true;
             }
             else if (e.Key == Key.Escape && Keyboard.FocusedElement is not TextBoxBase)
@@ -997,7 +1008,7 @@ namespace WebWeaver
                     HideInfoPanel();
                 }
 
-                SetStatus("Выделение снято");
+                SetStatus(Lang.StatusSelectionCleared);
                 e.Handled = true;
                 return;
             }
@@ -1063,7 +1074,7 @@ namespace WebWeaver
         private sealed class MapLevel
         {
             public MapData Map = new();
-            public string Title = "Корень";
+            public string Title = Lang.MapRootTitle;
         }
 
         private readonly List<MapLevel> _mapStack = new();
@@ -1085,9 +1096,10 @@ namespace WebWeaver
             DeselectAll();
             ClearMap();
 
+            _connections.AddRange(level.Map.Connections);
+
             foreach (var model in level.Map.Nodes)
                 AddNodeControl(model);
-            _connections.AddRange(level.Map.Connections);
 
             Dispatcher.InvokeAsync(() =>
             {
@@ -1110,16 +1122,15 @@ namespace WebWeaver
             _mapStack.RemoveRange(index + 1, _mapStack.Count - index - 1);
             LoadCanvasFromLevel(CurrentLevel);
 
-            SetStatus(_mapStack.Count == 1
-                ? "Вы в корневой карте."
-                : $"Открыта карта: {CurrentLevel.Title}");
+            SetStatus(_mapStack.Count == 1 ? Lang.StatusInRootMap
+                : Lang.StatusMapOpened.Replace("{&}", CurrentLevel.Title));
         }
 
         private void ExitMap()
         {
             if (_mapStack.Count <= 1)
             {
-                SetStatus("Вы уже в корневой карте.");
+                SetStatus(Lang.StatusAlreadyInRootMap);
                 return;
             }
             NavigateToLevel(_mapStack.Count - 2);
@@ -1138,17 +1149,13 @@ namespace WebWeaver
             _mapStack.Add(new MapLevel { Map = model.EmbeddedMap, Title = model.Name });
             LoadCanvasFromLevel(CurrentLevel);
 
-            SetStatus($"Открыта карта ноды «{model.Name}». ПКМ по фону — создать ноду внутри.");
+            SetStatus(Lang.StatusNodeMapOpened.Replace("{&}", model.Name));
         }
 
         // ── Сжать всю текущую карту в одну ноду ────────────────────────
         private void CompressCurrentMapIntoNode()
         {
-            if (_nodes.Count == 0)
-            {
-                SetStatus("Карта пуста — сжимать нечего.");
-                return;
-            }
+            if (_nodes.Count == 0) { SetStatus(Lang.StatusMapEmpty); return; }
 
             SyncCurrentLevelFromCanvas();
 
@@ -1164,7 +1171,7 @@ namespace WebWeaver
             var nd = SettingsManager.Settings.NodeDefaults;
             var wrapper = new NodeModel
             {
-                Name = _mapStack.Count > 1 ? CurrentLevel.Title : "Сжатая карта",
+                Name = _mapStack.Count > 1 ? CurrentLevel.Title : Lang.MapCompressedName,
                 X = cx,
                 Y = cy,
                 Width = AppSettings.NodeDefaultWidth,
@@ -1181,8 +1188,109 @@ namespace WebWeaver
             AddNodeControl(wrapper);
             SyncCurrentLevelFromCanvas();
 
-            SetStatus($"Карта сжата в ноду «{wrapper.Name}» ({packed.Nodes.Count} нод внутри). Двойной клик — открыть.");
-            PushHistory($"Карта сжата в нodу: «{wrapper.Name}»");
+            SetStatus(Lang.StatusMapCompressed.Replace("{&}", wrapper.Name).Replace("{*}", packed.Nodes.Count.ToString()));
+            PushHistory(Lang.HistoryMapCompressed.Replace("{&}", wrapper.Name));
+        }
+
+        //  ── Сжать произвольного выделения в ноду ────────────────────────
+        private void CompressSelectionIntoNode()
+        {
+            var ctrls = _groupSelection.ToList();
+            if (ctrls.Count == 0)
+            {
+                SetStatus(Lang.StatusSelectNodesFirst);
+                return;
+            }
+
+            SyncCurrentLevelFromCanvas();
+            var map = CurrentLevel.Map;
+
+            var selectedIds = ctrls.Select(c => c.Model.Id).ToHashSet();
+
+            // 1. Внутренность вложенной карты: выделенные ноды + связи между ними
+            var innerNodes = map.Nodes.Where(n => selectedIds.Contains(n.Id)).ToList();
+            var innerConns = map.Connections
+                .Where(c => selectedIds.Contains(c.FromNodeId) &&
+                            selectedIds.Contains(c.ToNodeId))
+                .ToList();
+
+            // 2. Габариты выделения (до нормировки) → центр обёртки;
+            //    внутри вложенной карты сдвигаем к началу координат
+            double minX = innerNodes.Min(n => n.X);
+            double minY = innerNodes.Min(n => n.Y);
+            double maxX = innerNodes.Max(n => n.X + n.Width);
+            double maxY = innerNodes.Max(n => n.Y + n.Height);
+
+            foreach (var n in innerNodes) { n.X -= minX - 40; n.Y -= minY - 40; }
+
+            var inner = new MapData();
+            inner.Nodes = innerNodes;
+            inner.Connections.AddRange(innerConns);
+
+            // 3. Обёртка: в центре габаритов выделения, внешний вид — как у первой ноды
+            var first = innerNodes[0];
+            var nd = SettingsManager.Settings.NodeDefaults;
+            var wrapper = new NodeModel
+            {
+                Id = Guid.NewGuid(),
+                Name = Lang.MapWrapperName.Replace("{&}", innerNodes.Count.ToString()),
+                X = (minX + maxX) / 2 - first.Width / 2,
+                Y = (minY + maxY) / 2 - first.Height / 2,
+                Width = AppSettings.NodeDefaultWidth,
+                Height = AppSettings.NodeDefaultHeight,
+                FontFamily = AppSettings.NodeDefaultFontFamily,
+                FontSize = AppSettings.NodeDefaultFontSize,
+                BackgroundColorHex = nd.Background,
+                HeaderColorHex = "#8A5AC8",
+                TextColorHex = nd.Text,
+                EmbeddedMap = inner
+            };
+
+            // 4. Связи уровня: внешние концы перепривязываются к обёртке
+            var external = new List<ConnectionModel>();
+            foreach (var c in map.Connections)
+            {
+                bool fromSel = selectedIds.Contains(c.FromNodeId);
+                bool toSel = selectedIds.Contains(c.ToNodeId);
+
+                if (fromSel && toSel) continue;                      // внутренняя — ушла в inner
+                if (!fromSel && !toSel) { external.Add(c); continue; }
+
+                external.Add(new ConnectionModel
+                {
+                    FromNodeId = fromSel ? wrapper.Id : c.FromNodeId,
+                    ToNodeId = toSel ? wrapper.Id : c.ToNodeId,
+                    FromPort = c.FromPort,  // порты сохраняются: обёртка наследует тот же конец
+                    ToPort = c.ToPort
+                });
+            }
+
+            // 5. Убираем выделенные ноды с полотна
+            foreach (var ctrl in ctrls)
+            {
+                mainCanvas.Children.Remove(ctrl);
+                _nodes.Remove(ctrl);
+            }
+
+            // 6. Полотно: новые связи + обёртка
+            _connections.Clear();
+            _connections.AddRange(external);
+
+            AddNodeControl(wrapper);  // внутри SyncNodesOnly: Map.Nodes = оставшиеся
+            CurrentLevel.Map.Nodes = _nodes.Select(n => n.Model).ToList(); // << SyncNodesOnly() << AddNodeControl синчит ДО добавления — дублируем для обёртки
+            RedrawArrows();           // если у вас метод называется иначе — подставьте ваш (перестроить стрелки)
+
+            // 7. ConnectedTo пересобираем: иначе там останутся Guid'ы сжатых нод
+            //    и ссылки в InfoPanel сломаются
+            foreach (var n in CurrentLevel.Map.Nodes)
+                n.ConnectedTo = _connections
+                    .Where(c => c.FromNodeId == n.Id).Select(c => c.ToNodeId)
+                    .Concat(_connections.Where(c => c.ToNodeId == n.Id).Select(c => c.FromNodeId))
+                    .Distinct().ToList();
+
+            ClearGroupSelection();
+            PushHistory(Lang.HistorySelectionCompressed);
+            SetStatus(Lang.StatusSelectionCompressed.Replace("{&}", wrapper.Name));
         }
 
         // ── Сжать ветку (нода + всё, куда ведут стрелки) в одну ноду ───
@@ -1203,7 +1311,7 @@ namespace WebWeaver
 
             if (ids.Count == 1)
             {
-                SetStatus("У ноды нет исходящих связей — сжимать нечего.");
+                SetStatus(Lang.StatusNoOutgoingLinks);
                 return;
             }
 
@@ -1258,8 +1366,8 @@ namespace WebWeaver
             SyncCurrentLevelFromCanvas();
             RedrawArrows();
 
-            SetStatus($"Ветка ({packedNodes.Count} нod) сжата в нodу «{wrapper.Name}».");
-            PushHistory($"Ветка сжата в нodу: «{wrapper.Name}»");
+            SetStatus(Lang.StatusBranchCompressed.Replace("{&}", packedNodes.Count.ToString()).Replace("{*}", wrapper.Name));
+            PushHistory(Lang.HistoryBranchCompressed.Replace("{&}", wrapper.Name));
         }
 
         // ── Добавить ноду из сохранённого файла карты ──────────────────
@@ -1267,8 +1375,8 @@ namespace WebWeaver
         {
             var dlg = new OpenFileDialog
             {
-                Title = "Добавить ноду из карты",
-                Filter = "Карты узлов (*.wwmap;*.gnmap)|*.wwmap;*.gnmap|Все файлы|*.*"
+                Title = Lang.FileDialogTitleAddFromMap,
+                Filter = Lang.FileDialogMapFilter
             };
             if (dlg.ShowDialog() != true) return;
             AddMapFileAsNode(dlg.FileName);
@@ -1300,7 +1408,7 @@ namespace WebWeaver
             var path = FindPathToNode(id, CurrentLevel.Map);
             if (path == null)
             {
-                SetStatus($"Нода {id} не найдена");
+                SetStatus(Lang.StatusNodeNotFoundById.Replace("{&}", id.ToString()));
                 return;
             }
 
@@ -1314,7 +1422,7 @@ namespace WebWeaver
 
             ctrl = _nodes.FirstOrDefault(n => n.Model.Id == id);
             if (ctrl != null) OpenOnCurrentLevel(ctrl);
-            else SetStatus($"Нода {id} найдена, но открыть её не удалось");
+            else SetStatus(Lang.StatusNodeNotOpenedById.Replace("{&}", id.ToString()));
         }
 
         private void OpenOnCurrentLevel(NodeControl ctrl)
@@ -1322,9 +1430,8 @@ namespace WebWeaver
             DeselectAll();
             SelectNode(ctrl);                 // выделение
             ShowInfoPanelForView(ctrl.Model); // блокнот (внутри он сам вызовет
-
-            SetStatus($"Переход к ноде «{ctrl.Model.Name}».");
-            PushHistory($"Переход к ноде: «{ctrl.Model.Name}»");
+            SetStatus(Lang.StatusGoToNode.Replace("{&}", ctrl.Model.Name));
+            PushHistory(Lang.HistoryGoToNode.Replace("{&}", ctrl.Model.Name));
         }                                     // EnsureNodeVisibleInFreeZone — камера подстроится)
 
         /// <summary>
@@ -1399,8 +1506,8 @@ namespace WebWeaver
             _connectSource = null;
             ClearTempLine();
             HideInfoPanel();
-            SetStatus("Карта очищена.");
-            PushHistory("Карта очищена.");
+            SetStatus(Lang.StatusMapCleared);
+            PushHistory(Lang.HistoryMapCleared);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -1493,7 +1600,7 @@ namespace WebWeaver
                 _connectFromLeft = fromLeft;
                 var portCenter = fromLeft ? ctrl.GetLeftPortCenter() : ctrl.GetRightPortCenter();
                 StartTempLine(portCenter);
-                SetStatus($"Выбрана нода «{ctrl.Model.Name}». Кликните на порт другой ноды.");
+                SetStatus(Lang.StatusConnectionPickTarget.Replace("{&}", ctrl.Model.Name));
             }
             else
             {
@@ -1536,7 +1643,7 @@ namespace WebWeaver
             // Нельзя соединить с собой
             if (_connectSource.Model.Id == target.Model.Id)
             {
-                SetStatus("Нельзя соединить ноду саму с собой.");
+                SetStatus(Lang.StatusConnectionSelf);
                 CancelConnection();
                 return;
             }
@@ -1546,7 +1653,7 @@ namespace WebWeaver
                 c.FromNodeId == _connectSource.Model.Id &&
                 c.ToNodeId == target.Model.Id))
             {
-                SetStatus("Такая связь уже существует.");
+                SetStatus(Lang.StatusConnectionExists);
                 CancelConnection();
                 return;
             }
@@ -1569,8 +1676,8 @@ namespace WebWeaver
 
             CancelConnection();
             DrawArrow(conn);
-            SetStatus($"Связь создана: «{fromName}» → «{toName}».");
-            PushHistory($"Связь создана: «{fromName}» → «{toName}»");
+            SetStatus(Lang.StatusConnectionCreated.Replace("{&}", fromName).Replace("{*}", toName));
+            PushHistory(Lang.HistoryConnectionCreated.Replace("{&}", fromName).Replace("{*}", toName));
         }
 
         private void CancelConnection()
@@ -1668,7 +1775,9 @@ namespace WebWeaver
                 e.Handled = true;
             }
 
-            PushHistory(_groupSelection.Count > 1 ? $"Перемещение нод ({_groupSelection.Count})" : "Перемещение ноды");
+            PushHistory(_groupSelection.Count > 1
+                ? Lang.HistoryNodesMoved.Replace("{&}", _groupSelection.Count.ToString())
+                : Lang.HistoryNodeMoved);
         }
 
         private void CanvasBorder_MouseRightButtonUp(object s, MouseButtonEventArgs e)
@@ -1678,8 +1787,8 @@ namespace WebWeaver
             {
                 _connectSource = null;
                 ClearTempLine();
-                SetStatus("Соединение отменено.");
-                PushHistory("Соединение отменено.");
+                SetStatus(Lang.StatusConnectionCancelled);
+                PushHistory(Lang.HistoryConnectionCancelled);
                 e.Handled = true;
                 return;
             }
@@ -1695,15 +1804,27 @@ namespace WebWeaver
 
             var cm = new ContextMenu();
 
-            var mi = new MenuItem { Header = "➕ Создать ноду" };
+            // Сжатие выделенного
+            if (_groupSelection.Count > 0)
+            {
+                var miSel = new MenuItem
+                {
+                    Header = Lang.MouseCollapseSelectionNode.Replace("{&}", _groupSelection.Count.ToString())
+                };
+                miSel.Click += (_, _) => CompressSelectionIntoNode();
+                cm.Items.Add(miSel);
+                cm.Items.Add(new Separator());
+            }
+
+            var mi = new MenuItem { Header = Lang.MouseNewNode };
             mi.Click += (_, _) => BtnNewNode(canvasPos);
             cm.Items.Add(mi);
 
-            var miFromMap = new MenuItem { Header = "📂 Добавить ноду из карты (.wwmap)…" };
+            var miFromMap = new MenuItem { Header = Lang.MouseAppFile };
             miFromMap.Click += (_, _) => AddNodeFromMapFile();
             cm.Items.Add(miFromMap);
 
-            var miCompress = new MenuItem { Header = "🗜 Сжать всю карту в одну ноду" };
+            var miCompress = new MenuItem { Header = Lang.MouseCollapseMapNode };
             miCompress.Click += (_, _) => CompressCurrentMapIntoNode();
             cm.Items.Add(miCompress);
 
@@ -1731,7 +1852,7 @@ namespace WebWeaver
             _historyIndex = -1;
             _history.Add(new HistoryEntry
             {
-                Title = "Начальное состояние",
+                Title = Lang.HistoryInitial,
                 Json = System.Text.Json.JsonSerializer.Serialize(_mapStack[0].Map)
             });
             _historyIndex = 0;
@@ -1757,21 +1878,21 @@ namespace WebWeaver
         // ═══════════════════════════════════════════════════════════════
         private void UndoHistory()
         {
-            if (_historyIndex <= 0) { SetStatus("Отменять нечего."); return; }
+            if (_historyIndex <= 0) { SetStatus(Lang.StatusUndoNothing); return; }
             string undone = _history[_historyIndex].Title;
             _historyIndex--;
             RestoreHistory(_history[_historyIndex]);
-            SetStatus($"Отменено: {undone}");
-            PushHistory($"Отменено: {undone}");
+            SetStatus(Lang.HistoryUndone.Replace("{&}", undone));
+            PushHistory(Lang.HistoryUndone.Replace("{&}", undone));
         }
 
         private void RedoHistory()
         {
-            if (_historyIndex >= _history.Count - 1) { SetStatus("Повторять нечего."); return; }
+            if (_historyIndex <= 0) { SetStatus(Lang.StatusRedoNothing); return; }
             _historyIndex++;
             RestoreHistory(_history[_historyIndex]);
-            SetStatus($"Повторено: {_history[_historyIndex].Title}");
-            PushHistory($"Повторено: {_history[_historyIndex].Title}");
+            SetStatus(Lang.HistoryRedone.Replace("{&}", _history[_historyIndex].Title));
+            PushHistory(Lang.HistoryRedone.Replace("{&}", _history[_historyIndex].Title));
         }
 
         private void RestoreHistory(HistoryEntry entry)
@@ -1788,7 +1909,7 @@ namespace WebWeaver
                 HideInfoPanel();
 
                 _mapStack.Clear();
-                _mapStack.Add(new MapLevel { Map = map, Title = "Корень" });
+                _mapStack.Add(new MapLevel { Map = map, Title = Lang.MapRootTitle });
 
                 LoadCanvasFromLevel(CurrentLevel); // если такого метода нет — вставьте сюда блок загрузки нод из OpenMapFromPath
                 ResetView();
@@ -1797,7 +1918,7 @@ namespace WebWeaver
             catch (Exception ex)
             {
                 _restoring = false;
-                SetStatus("Не удалось восстановить состояние: " + ex.Message);
+                SetStatus(Lang.StatusRestoreFailed.Replace("{&}", ex.Message));
             }
         }
 
@@ -1806,8 +1927,8 @@ namespace WebWeaver
             if (index < 0 || index >= _history.Count || index == _historyIndex) return;
             _historyIndex = index;
             RestoreHistory(_history[index]);
-            SetStatus($"Возврат к: {_history[index].Title}");
-            PushHistory($"Возвращено к: {_history[index].Title}");
+            SetStatus(Lang.StatusJumpTo.Replace("{&}", _history[index].Title));
+            PushHistory(Lang.HistoryJumpedBack.Replace("{&}", _history[index].Title));
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -1921,7 +2042,7 @@ namespace WebWeaver
                     AddToGroupSelection(ctrl);
 
             SnapshotGroupPositions();
-            SetStatus($"Выделено нод: {_groupSelection.Count}");
+            SetStatus(Lang.StatusGroupCount.Replace("{&}", _groupSelection.Count.ToString()));
         }
 
         private void CancelRubberSelection()
@@ -1930,7 +2051,7 @@ namespace WebWeaver
             StopAutoPan();
             mainCanvas.ReleaseMouseCapture();
             if (_rubberRect != null) { mainCanvas.Children.Remove(_rubberRect); _rubberRect = null; }
-            SetStatus("Выделение отменено.");
+            SetStatus(Lang.StatusRubberCancelled);
         }
 
         private void UpdateRubberRect()
@@ -2129,8 +2250,8 @@ namespace WebWeaver
 
             int count = ids.Count;
             ClearGroupSelection();
-            PushHistory($"Удаление нод ({count})");
-            SetStatus($"Удалено нод: {count}");
+            PushHistory(Lang.HistoryNodesDeleted.Replace("{&}", count.ToString()));
+            SetStatus(Lang.StatusNodesDeleted.Replace("{&}", count.ToString()));
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -2201,7 +2322,7 @@ namespace WebWeaver
             System.IO.File.WriteAllText(_currentFilePath,
                 System.Text.Json.JsonSerializer.Serialize(CurrentLevel.Map,
                     new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
-            SetStatus("Автосохранение выполнено.");
+            SetStatus(Lang.StatusAutosaved);
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -2222,7 +2343,7 @@ namespace WebWeaver
             {
                 X = canvasPos.Value.X,
                 Y = canvasPos.Value.Y,
-                Name = "Новая нода",
+                Name = Lang.DefaultName,
                 BackgroundColorHex = nd.Background,
                 HeaderColorHex = nd.Header,
                 TextColorHex = nd.Text,
@@ -2249,7 +2370,7 @@ namespace WebWeaver
 
             var win = new Window
             {
-                Title = "Дерево нод",
+                Title = Lang.NodeTreeTitle,
                 Width = 440,
                 Height = 540,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
@@ -2262,8 +2383,8 @@ namespace WebWeaver
             var topSp = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
             var lblPath = new TextBlock
             {
-                Text = "Вы здесь: " + string.Join("  ›  ",
-                    _mapStack.Select((l, i) => i == 0 ? "🏠 Корень" : l.Title)),
+                Text = Lang.NodeTreeYouAreHere.Replace("{&}", string.Join("  ›  ",
+                    _mapStack.Select((l, i) => i == 0 ? Lang.NodeTreeRoot : l.Title))),
                 Foreground = new SolidColorBrush(Color.FromRgb(255, 220, 50)),
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 8)
@@ -2273,18 +2394,18 @@ namespace WebWeaver
             var btnRow = new StackPanel { Orientation = Orientation.Horizontal };
             var btnUp = new Button
             {
-                Content = "⬆ Уровень выше",
+                Content = Lang.NodeTreePointUp,
                 Padding = new Thickness(10, 4, 10, 4),
                 Margin = new Thickness(0, 0, 8, 0),
                 BorderThickness = new Thickness(0)
             };
             T(btnUp, Control.BackgroundProperty, "Brush.AccentBtn");
             T(btnUp, Control.ForegroundProperty, "Brush.BtnText");
-            btnUp.Click += (_, _) => { ExitMap(); /*win.Close();*/ };
+            btnUp.Click += (_, _) => { ExitMap(); };
 
             var btnRoot = new Button
             {
-                Content = "🏠 В корень",
+                Content = Lang.NodeTreeGoRoot,
                 Padding = new Thickness(10, 4, 10, 4),
                 BorderThickness = new Thickness(0)
             };
@@ -2301,7 +2422,7 @@ namespace WebWeaver
 
             var hint = new TextBlock
             {
-                Text = "Двойной клик по 🗺 — перейти внутрь этой карты.",
+                Text = Lang.NodeTreeHintDoubleClick,
                 Foreground = new SolidColorBrush(Color.FromRgb(120, 125, 140)),
                 Margin = new Thickness(0, 8, 0, 0)
             };
@@ -2348,7 +2469,7 @@ namespace WebWeaver
 
             var rootItem = new TreeViewItem
             {
-                Header = new TextBlock { Text = "🏠 Корень", Foreground = Brushes.White },
+                Header = new TextBlock { Text = Lang.NodeTreeRoot, Foreground = Brushes.White },
                 IsExpanded = true
             };
             Fill(rootItem, _mapStack[0].Map, new List<Guid>());
@@ -2363,8 +2484,8 @@ namespace WebWeaver
         {
             var dlg = new SaveFileDialog
             {
-                Title = "Сохранить карту",
-                Filter = "Карта узлов (*.wwmap)|*.wwmap|Все файлы|*.*",
+                Title = Lang.FileDialogTitleSave,
+                Filter = Lang.FileDialogWwmapFilter,
                 DefaultExt = ".wwmap",
                 AddExtension = true
             };
@@ -2382,15 +2503,15 @@ namespace WebWeaver
 
             _currentFilePath = path;
             UpdateTitleBar();
-            SetStatus($"Сохранено: {System.IO.Path.GetFileName(path)}");
+            SetStatus(Lang.StatusSaved.Replace("{&}", System.IO.Path.GetFileName(path)));
         }
 
         private void BtnOpen()
         {
             var dlg = new OpenFileDialog
             {
-                Title = "Открыть карту",
-                Filter = "Карты узлов (*.wwmap;*.gnmap)|*.wwmap;*.gnmap|Все файлы|*.*"
+                Title = Lang.FileDialogTitleOpen,
+                Filter = Lang.FileDialogMapFilter,
             };
             if (dlg.ShowDialog() == true)
                 OpenMapFromPath(dlg.FileName);
@@ -2400,7 +2521,7 @@ namespace WebWeaver
         {
             var win = new Window
             {
-                Title = "История операций",
+                Title = Lang.HistoryWindowTitle,
                 Width = 360,
                 Height = 440,
                 Owner = this,
@@ -2432,7 +2553,7 @@ namespace WebWeaver
 
             var hint = new TextBlock
             {
-                Text = "Двойной клик — перейти к этому состоянию",
+                Text = Lang.HistoryHintDoubleClick,
                 Foreground = Brushes.Gray,
                 Margin = new Thickness(10, 6, 0, 6)
             };
@@ -2449,9 +2570,7 @@ namespace WebWeaver
 
         private void BtnClearAll()
         {
-            var r = MessageBox.Show(
-                "Очистить всю карту? Несохранённые данные будут потеряны.",
-                "Подтверждение", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            var r = MessageBox.Show(Lang.ClearAllQuestion, Lang.DialogConfirmation, MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (r == MessageBoxResult.Yes) ClearAll();
         }
 
@@ -2462,9 +2581,9 @@ namespace WebWeaver
             //var confirmed = false;
 
             #region MyRegion
-            var cpw = new ControlPanelWindow("Поиск по тексту", new[]
+            var cpw = new ControlPanelWindow(Lang.FindNodeSearchText, new[]
             {
-                "TextBox|Текст поиска||Search.text||",
+                $"TextBox|{Lang.FindNodeFoundText}||Search.text||",
                 "Button2|Option1|Описание|bt2.v1|label|close;",
                 "Button2|Option2|Описание|bt2.v2|label|close;",
                 "Button2|Option3|Описание|bt2.v3|label|close;",
@@ -2511,12 +2630,12 @@ namespace WebWeaver
                     {
                         if (data.Text.ToLower().Contains(val))
                         {
-                            BuffArr[num] = ("", data.Id, "lvl:" + data.Level + " " + data.Name, GetExscindText(data.Text, val));
+                            BuffArr[num] = ("", data.Id, Lang.FindNodeLevelPrefix + data.Level + " " + data.Name, GetExscindText(data.Text, val));
                             if (num < BuffArr.Length - 1) num++;
                         }
                         else if (data.Name.ToLower().Contains(val))
                         {
-                            BuffArr[num] = ("", data.Id, "lvl:" + data.Level + " " + data.Name, data.Text.Substring(0, Math.Min(20, data.Text.Length)) + "...");
+                            BuffArr[num] = ("", data.Id, Lang.FindNodeLevelPrefix + data.Level + " " + data.Name, data.Text.Substring(0, Math.Min(20, data.Text.Length)) + "...");
                             if (num < BuffArr.Length - 1) num++;
                         }
                     }
@@ -2554,7 +2673,7 @@ namespace WebWeaver
         {
             var win = new Window
             {
-                Title = "Найти ноду",
+                Title = Lang.FindNode,
                 Width = 360,
                 Height = 180,
                 Background = new SolidColorBrush(Color.FromRgb(32, 35, 43)),
@@ -2567,7 +2686,7 @@ namespace WebWeaver
             var sp = new StackPanel { Margin = new Thickness(16) };
             var lbl = new TextBlock
             {
-                Text = "Введите имя ноды:",
+                Text = Lang.FindNodeNodeName,
                 Foreground = Brushes.LightGray,
                 Margin = new Thickness(0, 0, 0, 6)
             };
@@ -2581,7 +2700,7 @@ namespace WebWeaver
 
             var btn = new Button
             {
-                Content = "Найти",
+                Content = Lang.FindNodeFind,
                 Margin = new Thickness(0, 8, 0, 0),
                 Background = new SolidColorBrush(Color.FromRgb(60, 130, 200)),
                 Foreground = Brushes.White,
@@ -2595,8 +2714,9 @@ namespace WebWeaver
             {
                 var q = tb.Text.Trim().ToLower();
                 var ctrl = _nodes.FirstOrDefault(n => n.Model.Name.ToLower().Contains(q));
+                var nnf = Lang.FindNodeNodeNotFound.Split("{&}");
                 if (ctrl != null) { FocusNode(ctrl); win.Close(); }
-                else SetStatus($"Нода «{tb.Text}» не найдена.");
+                else SetStatus(nnf[0] + tb.Text + nnf[1]);
             };
             tb.KeyDown += (_, e2) => { if (e2.Key == Key.Enter) btn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); };
             sp.Children.Add(lbl);
@@ -2621,40 +2741,37 @@ namespace WebWeaver
 
             string themeRow = s.Theme switch
             {
-                "Light" => "Тёмная,*Светлая,Кастомная",
-                "Custom" => "Тёмная,Светлая,*Кастомная",
-                _ => "*Тёмная,Светлая,Кастомная"
+                "Light" => $"{Lang.ThemeDark},*{Lang.ThemeLight},{Lang.ThemeCustom}",
+                "Custom" => $"{Lang.ThemeDark},{Lang.ThemeLight},*{Lang.ThemeCustom}",
+                _ => $"*{Lang.ThemeDark},{Lang.ThemeLight},{Lang.ThemeCustom}"
             };
-            string langRow = s.Language == "en" ? "Русский,*English" : "*Русский,English";
+
+            //string langRow = s.Language == "en" ? "Русский,*English" : "*Русский,English";
+            string langRow = WebWeaver.Language.FormattedDataLang(s.Language);
+            //string langRow = WebWeaver.Language.LangList(s.Language);
 
             // Снимок на входе — из него откатываем при Отмене/закрытии
             var snapshot = SettingsManager.Snapshot();
             bool confirmed = false;
 
-            var win = new ControlPanelWindow("Настройки", new[]
+            var win = new ControlPanelWindow(Lang.SettingsTitle, new[]
             {
-                "TextBlock|Общие||sect.gen|label|",
-                $"Combo|Язык|Язык интерфейса (локализация позже)|set.language|label|{langRow};",
-                $"Combo|Тема|Применяется сразу. «Кастомная» правится в Settings.json|set.theme|label|{themeRow};",
-
-                "TextBlock|Автосохранение||sect.auto|label|;",
-                $"Check|Включить|Сохранять карту автоматически|set.auto.enabled|label|{(s.Autosave.Enabled ? "true" : "false")};",
-
-                $"TextBlock|Интервал: {FormatSecondsOptimized(s.Autosave.IntervalSeconds)}||sect.label.interval|label|;",
-                $"Slider|Интервал, сек|Пауза между автосохранениями|set.auto.interval|label|30,1800,{s.Autosave.IntervalSeconds},5;",
-
-                $"TextBlock|После изменений: {s.Autosave.ChangesCount}||sect.label.changes|label|;",
-                $"Slider|После изменений|Сохранять после N изменений|set.auto.changes|label|5,200,{s.Autosave.ChangesCount},1;",
-
-                "TextBlock|Цвета нод по умолчанию||sect.node|label|;",
-                $"TextBox|Фон (hex)|Фон новой ноды, формат #RRGGBB|set.node.bg|label|{s.NodeDefaults.Background};"+
-                $"TextBox|Заголовок (hex)|Цвет шапки новой ноды|set.node.header|label|{s.NodeDefaults.Header};"+
-                $"TextBox|Текст (hex)|Цвет текста в ноде|set.node.text|label|{s.NodeDefaults.Text};",
-
-                "Button|Открыть Settings.json|Цвета тем и параметры правятся в файле|set.openfile|tooltip|;",
-
-                "Button|Готово|Применить и записать Settings.json|btn.ok|label|close;" +
-                "Button|Отмена|Вернуть сохранённое (перечитывает файл)|btn.cancel|label|close;"
+                $"TextBlock|{Lang.SettingsSectionGeneral}||sect.gen|label|",
+                $"Combo|{Lang.SettingsLanguage}|{Lang.SettingsLanguageDesc}|set.language|label|{langRow};",
+                $"Combo|{Lang.SettingsTheme}|{Lang.SettingsThemeDesc}|set.theme|label|{themeRow};",
+                $"TextBlock|{Lang.SettingsSectionAutosave}||sect.auto|label|;",
+                $"Check|{Lang.SettingsAutosaveEnable}|{Lang.SettingsAutosaveEnableDesc}|set.auto.enabled|label|{(s.Autosave.Enabled ? "true" : "false")};",
+                $"TextBlock|{Lang.SettingsIntervalCaption.Replace("{&}", FormatSecondsOptimized(s.Autosave.IntervalSeconds))}||sect.label.interval|label|;",
+                $"Slider|{Lang.SettingsIntervalName}|{Lang.SettingsIntervalDesc}|set.auto.interval|label|30,1800,{s.Autosave.IntervalSeconds},5;",
+                $"TextBlock|{Lang.SettingsChangesCaption.Replace("{&}", s.Autosave.ChangesCount.ToString())}||sect.label.changes|label|;",
+                $"Slider|{Lang.SettingsChangesName}|{Lang.SettingsChangesDesc}|set.auto.changes|label|5,200,{s.Autosave.ChangesCount},1;",
+                $"TextBlock|{Lang.SettingsSectionNodeColors}||sect.node|label|;",
+                $"TextBox|{Lang.SettingsNodeBg}|{Lang.SettingsNodeBgDesc}|set.node.bg|label|{s.NodeDefaults.Background};"+
+                $"TextBox|{Lang.SettingsNodeHeader}|{Lang.SettingsNodeHeaderDesc}|set.node.header|label|{s.NodeDefaults.Header};"+
+                $"TextBox|{Lang.SettingsNodeText}|{Lang.SettingsNodeTextDesc}|set.node.text|label|{s.NodeDefaults.Text};",
+                $"Button|{Lang.SettingsOpenFile}|{Lang.SettingsOpenFileDesc}|set.openfile|tooltip|;",
+                $"Button|{Lang.SettingsDone}|{Lang.SettingsDoneDesc}|btn.ok|label|close;" +
+                $"Button|{Lang.PanelCancel}|{Lang.SettingsCancelDesc}|btn.cancel|label|close;"
             });
 
             win.ValueChanged += result =>
@@ -2671,9 +2788,11 @@ namespace WebWeaver
                 // Живые подписи слайдеров
                 string val = parts.Length > 1 ? parts[1] : "";
                 if (id == "set.auto.interval" && Num(val, out double sec))
-                    win.SetText("sect.label.interval", $"Интервал: {FormatSecondsOptimized((int)Math.Round(sec))}");
+                    win.SetText("sect.label.interval", Lang.SettingsIntervalCaption.Replace("{&}", FormatSecondsOptimized((int)Math.Round(sec))));
                 if (id == "set.auto.changes" && Num(val, out double cnt))
-                    win.SetText("sect.label.changes", $"После изменений: {(int)Math.Round(cnt)}");
+                    win.SetText("sect.label.changes", Lang.SettingsChangesCaption.Replace("{&}", ((int)Math.Round(cnt)).ToString()));
+                if (id == "set.language") 
+                    WebWeaver.Language.Set(val.Trim('!'));
             };
 
             win.Owner = this;
@@ -2682,12 +2801,12 @@ namespace WebWeaver
             if (confirmed)
             {
                 SettingsManager.Save();           // Готово: актуальное состояние целиком → Settings.json
-                SetStatus("Настройки сохранены.");
+                SetStatus(Lang.StatusSettingsSaved);
             }
             else
             {
                 SettingsManager.Restore(snapshot); // Отмена / ✕ / Alt+F4 — полный откат, файл не тронут
-                SetStatus("Изменения настроек отменены.");
+                SetStatus(Lang.StatusSettingsCancelled);
             }
 
             LoadButtonPanel(this);
@@ -2703,12 +2822,18 @@ namespace WebWeaver
             switch (id)
             {
                 case "set.theme":
-                    s.Theme = value switch { "Светлая" => "Light", "Кастомная" => "Custom", _ => "Dark" };
+                    s.Theme = value switch
+                    {
+                        var v when v == Lang.ThemeLight => "Light",
+                        var v when v == Lang.ThemeCustom => "Custom",
+                        _ => "Dark"
+                    };
                     SettingsManager.ApplyTheme();  // живой предпросмотр, файл не пишем
                     break;
 
                 case "set.language":
-                    s.Language = value == "English" ? "en" : "ru";
+                    //s.Language = value == "English" ? "en" : "ru";
+                    s.Language = value;
                     break;
 
                 case "set.auto.enabled":
@@ -2744,14 +2869,14 @@ namespace WebWeaver
                             UseShellExecute = true
                         });
                     }
-                    catch { MessageBox.Show(SettingsManager.FilePath, "Файл настроек"); }
+                    catch { MessageBox.Show(SettingsManager.FilePath, Lang.SettingsFileTitle); }
                     break;
             }
         }
 
         public static string FormatSecondsOptimized(long totalSeconds)
         {
-            if (totalSeconds <= 0) return "0 сек.";
+            if (totalSeconds <= 0) return "0" + Lang.TimeSeconds;
 
             // Прямой расчет без TimeSpan
             long hours = totalSeconds / 3600;
@@ -2764,17 +2889,17 @@ namespace WebWeaver
 
             if (hours > 0)
             {
-                sb.Append(hours).Append(" ч.");
+                sb.Append(hours).Append(Lang.TimeHours);
             }
             if (minutes > 0)
             {
                 if (sb.Length > 0) sb.Append(", ");
-                sb.Append(minutes).Append(" мин.");
+                sb.Append(minutes).Append(Lang.TimeMinutes);
             }
             if (seconds > 0)
             {
                 if (sb.Length > 0) sb.Append(", ");
-                sb.Append(seconds).Append(" сек.");
+                sb.Append(seconds).Append(Lang.TimeSeconds);
             }
 
             return sb.ToString();
@@ -2809,14 +2934,14 @@ namespace WebWeaver
 
                 if (map == null || map.Nodes.Count == 0)
                 {
-                    MessageBox.Show("Файл пуст или не является картой узлов.", "Ошибка",
+                    MessageBox.Show(Lang.ErrorFileNotMap, Lang.Error,
                         MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
 
                 // 1. Сбрасываем стек уровней: загруженная карта становится корнем
                 _mapStack.Clear();
-                _mapStack.Add(new MapLevel { Map = map, Title = "Корень" });
+                _mapStack.Add(new MapLevel { Map = map, Title = Lang.MapRootTitle });
 
                 // 2. Полностью очищаем полотно
                 ClearTempLine();
@@ -2825,11 +2950,11 @@ namespace WebWeaver
                 HideInfoPanel();
                 ClearMap();
 
+                _connections.AddRange(map.Connections);
+
                 // 3. Загружаем ноды и связи
                 foreach (var model in map.Nodes)
                     AddNodeControl(model);
-
-                _connections.AddRange(map.Connections);
 
                 // 4. Рисуем стрелки после того, как ноды получат реальные размеры
                 Dispatcher.InvokeAsync(() =>
@@ -2843,12 +2968,12 @@ namespace WebWeaver
                 UpdateTitleBar();
                 ResetView();
 
-                SetStatus($"Открыто: {System.IO.Path.GetFileName(path)} ({map.Nodes.Count} нод)");
-                PushHistory($"Открыта карта: {System.IO.Path.GetFileName(path)}");
+                SetStatus(Lang.StatusOpenedFile.Replace("{&}", System.IO.Path.GetFileName(path)).Replace("{0}", map.Nodes.Count.ToString()));
+                PushHistory(Lang.HistoryMapOpened.Replace("{&}", System.IO.Path.GetFileName(path)));
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Не удалось открыть карту:\n{ex.Message}", "Ошибка",
+                MessageBox.Show(Lang.ErrorOpenMap.Replace("{0}", ex.Message), Lang.Error,
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -3043,16 +3168,70 @@ namespace WebWeaver
                 case "BtnZoomOut": ZoomAt(-AppSettings.ZoomStep); break; //  - зумм
 
                 default:
-                    SetStatus($"Нажата кнопка панели: {id}");
+                    SetStatus(Lang.StatusPressButton.Replace("{&}", id));
                     break;
             }
         }
 
         public static void LoadButtonPanel(MainWindow window)
         {
-            foreach (var (key, grp) in SettingsManager.Settings.GetToolbarGroups())
+            foreach (var (key, buttons) in SettingsManager.Settings.GetToolbarGroups())
             {
-                if (grp.IsEmpty)
+                if(buttons.Count > 0)
+                {
+                    var BtnGrupData = new ToolbarGroup();
+
+                    switch (key)
+                    {
+                        case "bt1": BtnGrupData.Content = Lang.Button1[0]; BtnGrupData.Tag = Lang.Button1[1]; break;
+                        case "bt2": BtnGrupData.Content = Lang.Button2[0]; BtnGrupData.Tag = Lang.Button2[1]; break;
+                        case "bt3": BtnGrupData.Content = Lang.Button3[0]; BtnGrupData.Tag = Lang.Button3[1]; break;
+                        case "bt4": BtnGrupData.Content = Lang.Button4[0]; BtnGrupData.Tag = Lang.Button4[1]; break;
+                        case "bt5": BtnGrupData.Content = Lang.Button5[0]; BtnGrupData.Tag = Lang.Button5[1]; break;
+                        case "bt6": BtnGrupData.Content = Lang.Button6[0]; BtnGrupData.Tag = Lang.Button6[1]; break;
+                        case "bt7": BtnGrupData.Content = Lang.Button7[0]; BtnGrupData.Tag = Lang.Button7[1]; break;
+                        case "bt8": BtnGrupData.Content = Lang.Button8[0]; BtnGrupData.Tag = Lang.Button8[1]; break;
+                        case "bt9": BtnGrupData.Content = Lang.Button9[0]; BtnGrupData.Tag = Lang.Button9[1]; break;
+                    }
+
+                    for (int i = 0; i < buttons.Count; i++)
+                    {
+                        var btn = buttons[i].Split("|");
+                        buttons[i] = btn[0] switch
+                        {
+                            "BtnNewNode" => String.Join('|', Lang.BtnNewNode) + "|" + buttons[i],
+                            "AddNodeFromMapFile" => String.Join('|', Lang.AddNodeFromMapFile) + "|" + buttons[i],
+                            "BtnSave" => String.Join('|', Lang.BtnSave) + "|" + buttons[i],
+                            "BtnSaveAs" => String.Join('|', Lang.BtnSaveAs) + "|" + buttons[i],
+                            "BtnOpen" => String.Join('|', Lang.BtnOpen) + "|" + buttons[i],
+                            "ShowNodeTree" => String.Join('|', Lang.ShowNodeTree) + "|" + buttons[i],
+                            "BtnHistory" => String.Join('|', Lang.BtnHistory) + "|" + buttons[i],
+                            "BtnClearAll" => String.Join('|', Lang.BtnClearAlll) + "|" + buttons[i],
+                            "BtnFindNode" => String.Join('|', Lang.BtnFindNode) + "|" + buttons[i],
+                            "BtnSettings" => String.Join('|', Lang.BtnSettings) + "|" + buttons[i],
+                            "BtnResetView" => String.Join('|', Lang.BtnResetView) + "|" + buttons[i],
+                            "BtnZoomIn" => String.Join('|', Lang.BtnZoomIn) + "|" + buttons[i],
+                            "BtnZoomOut" => String.Join('|', Lang.BtnZoomOut) + "|" + buttons[i],
+                            _ => btn[0]
+                        };
+                    }
+
+                    BtnGrupData.Button = buttons;
+
+                    switch (key)
+                    {
+                        case "bt1": window.bt1.Content = BtnGrupData.Content; window.bt1.Tag = BtnGrupData.Tag; break;
+                        case "bt2": window.bt2.Content = BtnGrupData.Content; window.bt2.Tag = BtnGrupData.Tag; break;
+                        case "bt3": window.bt3.Content = BtnGrupData.Content; window.bt3.Tag = BtnGrupData.Tag; break;
+                        case "bt4": window.bt4.Content = BtnGrupData.Content; window.bt4.Tag = BtnGrupData.Tag; break;
+                        case "bt5": window.bt5.Content = BtnGrupData.Content; window.bt5.Tag = BtnGrupData.Tag; break;
+                        case "bt6": window.bt6.Content = BtnGrupData.Content; window.bt6.Tag = BtnGrupData.Tag; break;
+                        case "bt7": window.bt7.Content = BtnGrupData.Content; window.bt7.Tag = BtnGrupData.Tag; break;
+                        case "bt8": window.bt8.Content = BtnGrupData.Content; window.bt8.Tag = BtnGrupData.Tag; break;
+                        case "bt9": window.bt9.Content = BtnGrupData.Content; window.bt9.Tag = BtnGrupData.Tag; break;
+                    }
+                }
+                else
                 {
                     switch (key)
                     {
@@ -3066,20 +3245,6 @@ namespace WebWeaver
                         case "bt8": window.bt8.Visibility = Visibility.Collapsed; break;
                         case "bt9": window.bt9.Visibility = Visibility.Collapsed; break;
                     }
-                    continue;
-                }
-
-                switch (key)
-                {
-                    case "bt1": window.bt1.Content = grp.Content; break;
-                    case "bt2": window.bt2.Content = grp.Content; break;
-                    case "bt3": window.bt3.Content = grp.Content; break;
-                    case "bt4": window.bt4.Content = grp.Content; break;
-                    case "bt5": window.bt5.Content = grp.Content; break;
-                    case "bt6": window.bt6.Content = grp.Content; break;
-                    case "bt7": window.bt7.Content = grp.Content; break;
-                    case "bt8": window.bt8.Content = grp.Content; break;
-                    case "bt9": window.bt9.Content = grp.Content; break;
                 }
             }
         }
@@ -3091,8 +3256,7 @@ namespace WebWeaver
             if (s is not Button b) return;
             if (!SettingsManager.Settings.BtSettings.TryGetValue(b.Name, out var grp)) return;
 
-            ShowActionPanel(b, grp.Title,
-                grp.Button.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray());
+            ShowActionPanel(b, (string)b.Tag, grp.ToArray());
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -3118,7 +3282,7 @@ namespace WebWeaver
 
             if (ext != ".wwmap" && ext != ".gnmap")
             {
-                SetStatus($"«{System.IO.Path.GetFileName(path)}» — не файл карты (.wwmap/.gnmap).");
+                SetStatus($"«{System.IO.Path.GetFileName(path)}» — {Lang.DropNoMap} (.wwmap/.gnmap).");
                 return;
             }
 
@@ -3134,7 +3298,7 @@ namespace WebWeaver
 
             var win = new Window
             {
-                Title = "Файл карты",
+                Title = Lang.DropTitle,
                 Width = 400,
                 SizeToContent = SizeToContent.Height,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
@@ -3147,7 +3311,7 @@ namespace WebWeaver
             var sp = new StackPanel { Margin = new Thickness(16) };
             var lbl = new TextBlock
             {
-                Text = $"«{System.IO.Path.GetFileName(path)}» — что сделать?",
+                Text = $"«{System.IO.Path.GetFileName(path)}» — " + Lang.DropWhat,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 14)
             };
@@ -3189,9 +3353,9 @@ namespace WebWeaver
                 return b;
             }
 
-            var btnOpen = MkBtn("📂", "Открыть как карту", "Brush.AccentBtn", accent: true);
-            var btnNode = MkBtn("📦", "Добавить как ноду", "Brush.BtnBg", accent: false);
-            var btnCancel = MkBtn("", "Отмена", "Brush.BtnBg", accent: false);
+            var btnOpen = MkBtn("📂", Lang.DropMap, "Brush.AccentBtn", accent: true);
+            var btnNode = MkBtn("📦", Lang.DropNode, "Brush.BtnBg", accent: false);
+            var btnCancel = MkBtn("", Lang.DropCancel, "Brush.BtnBg", accent: false);
 
             btnOpen.Click += (_, _) => { openAsMap = true; win.Close(); };
             btnNode.Click += (_, _) => { asNode = true; win.Close(); };
@@ -3220,7 +3384,7 @@ namespace WebWeaver
                 var map = System.Text.Json.JsonSerializer.Deserialize<MapData>(json);
                 if (map == null || map.Nodes.Count == 0)
                 {
-                    SetStatus("Файл пуст или не является картой узлов.");
+                    SetStatus(Lang.ErrorFileNotMap);
                     return;
                 }
 
@@ -3249,12 +3413,12 @@ namespace WebWeaver
                 AddNodeControl(model);
                 SyncCurrentLevelFromCanvas();
 
-                SetStatus($"Добавлена нода-карта «{model.Name}» ({map.Nodes.Count} нод внутри).");
-                PushHistory($"Добавлена нода-карта «{model.Name}»");
+                SetStatus(Lang.StatusMapNodeCreated.Replace("{&}", model.Name).Replace("{*}", map.Nodes.Count.ToString()));
+                PushHistory(Lang.HistoryMapNodeCreated.Replace("{&}", model.Name));
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Не удалось загрузить карту:\n{ex.Message}", "Ошибка",
+                MessageBox.Show(Lang.ErrorOpenMap.Replace("{0}", ex.Message), Lang.Error,
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
