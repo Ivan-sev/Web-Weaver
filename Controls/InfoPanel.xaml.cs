@@ -41,7 +41,7 @@ public partial class InfoPanel : UserControl
     {
         _current = model;
         _isViewMode = true;
-        tbPanelTitle.Text = $"📖 Блокнот: {model.Name}";
+        tbPanelTitle.Text = $"{Lang.NotepadName}: {model.Name}";
         spViewMode.Visibility = Visibility.Visible;
         spEditMode.Visibility = Visibility.Collapsed;
 
@@ -76,11 +76,11 @@ public partial class InfoPanel : UserControl
     private void ShowViewEditor()
     {
         _viewEditing = true;
-        tbTextLabel.Text = "Блокнот";
+        tbTextLabel.Text = Lang.NotepadEditNode;
         tbLinkHint.Visibility = Visibility.Visible;
         rtbPreview.Visibility = Visibility.Collapsed;
         txText.Visibility = Visibility.Visible;
-        btnToggleText.Content = "Предпросмотр";
+        btnToggleText.Content = Lang.NotepadViewNode;
         txText.Focus();
         txText.CaretIndex = txText.Text.Length;
     }
@@ -88,11 +88,11 @@ public partial class InfoPanel : UserControl
     private void ShowViewPreview()
     {
         _viewEditing = false;
-        tbTextLabel.Text = "Текст ноды";
+        tbTextLabel.Text = Lang.NotepadTextNode;
         tbLinkHint.Visibility = Visibility.Collapsed;
         txText.Visibility = Visibility.Collapsed;
         rtbPreview.Visibility = Visibility.Visible;
-        btnToggleText.Content = "Изменить";
+        btnToggleText.Content = Lang.NotepadEdit;
         if (_viewNodes != null) RebuildPreview(_viewNodes);
     }
 
@@ -102,10 +102,10 @@ public partial class InfoPanel : UserControl
     }
 
     public void LoadForEdit(NodeModel model) => 
-        LoadForEditMode(model, "✏️ Редактировать ноду");
+        LoadForEditMode(model, Lang.NodeEdit);
 
     public void LoadForCreate(NodeModel model) => 
-        LoadForEditMode(model, "✨ Новая нода");
+        LoadForEditMode(model, Lang.NodeNew);
 
     private void LoadForEditMode(NodeModel model, string title)
     {
@@ -247,7 +247,7 @@ public partial class InfoPanel : UserControl
             else
             {
                 hl.Foreground = Brushes.OrangeRed;
-                hl.ToolTip = "Нода не найдена";
+                hl.ToolTip = Lang.NotepadErrorNodeSearch;
             }
         }
 
@@ -326,10 +326,12 @@ public partial class InfoPanel : UserControl
 
     private void BtnPickImage_Click(object s, RoutedEventArgs e)
     {
+        var buffArr = Lang.NodeAllFiles.Split("{&}");
+
         var dlg = new OpenFileDialog
         {
-            Title = "Выбрать картинку",
-            Filter = "Изображения|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp|Все файлы|*.*"
+            Title = Lang.NodeSelectImage,
+            Filter = $"{buffArr[0]}|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp|{buffArr[1]}|*.*"
         };
         if (dlg.ShowDialog() == true) txImagePath.Text = dlg.FileName;
     }
