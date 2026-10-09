@@ -155,8 +155,8 @@ public partial class ColorPickerDialog : Window
 
         if (SelectedColor.Length != 7)
         {
-            MessageBox.Show("Пожалуйста, введите корректный hex код (например: #FF00FF)", 
-                "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(Lang.ColorPickerInvalidHex, Lang.ErrorTitle,
+                MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
