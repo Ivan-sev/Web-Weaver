@@ -53,7 +53,7 @@ namespace WebWeaver.Services
         {
             if (string.IsNullOrWhiteSpace(twoLetterCode) || twoLetterCode.Length != 2)
             {
-                return "Неверный код";
+                return Lang.RegionInvalidCode;
             }
 
             try
@@ -74,7 +74,7 @@ namespace WebWeaver.Services
             catch (ArgumentException)
             {
                 // Сработает, если передан несуществующий ISO-код
-                return $"Неизвестная страна ({twoLetterCode})";
+                return Lang.RegionUnknownCountry.Replace("{&}", twoLetterCode);
             }
             catch (Exception)
             {
@@ -91,7 +91,7 @@ namespace WebWeaver.Services
         {
             if (string.IsNullOrWhiteSpace(twoLetterCountryCode) || twoLetterCountryCode.Length != 2)
             {
-                return "Неверный код страны";
+                return Lang.RegionInvalidCountryCode;
             }
 
             try
@@ -119,11 +119,11 @@ namespace WebWeaver.Services
             }
             catch (ArgumentException)
             {
-                return $"Неизвестный язык ({twoLetterCountryCode})";
+                return Lang.RegionUnknownLanguage.Replace("{0}", twoLetterCountryCode);
             }
             catch (Exception)
             {
-                return "Ошибка определения языка";
+                return Lang.RegionDetectError;
             }
         }
     }
