@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using Microsoft.VisualBasic;
+using System.Linq;
 using System.Text.Json.Serialization;
 
 namespace WebWeaver.Models
@@ -6,7 +7,7 @@ namespace WebWeaver.Models
     /// <summary>Корневой объект Settings.json.</summary>
     public class SettingsData
     {
-        public string Language { get; set; } = "ru";   // "ru" | "en" (локализация — позже)
+        public string Language { get; set; } = "Русский";
         public string Theme { get; set; } = "Dark";    // ключ из Themes
 
         public NodeDefaults NodeDefaults { get; set; } = new();
@@ -16,10 +17,10 @@ namespace WebWeaver.Models
         public Dictionary<string, ThemePalette> Themes { get; set; } = DefaultThemes();
 
         [JsonPropertyName("btSettings")]
-        public Dictionary<string, ToolbarGroup> BtSettings { get; set; } = DefaultToolbar();
+        public Dictionary<string, List<string>> BtSettings { get; set; } = DefaultToolbar();
 
-        public ThemePalette Current =>
-            Themes.TryGetValue(Theme, out var t) ? t : Themes["Dark"];
+        [JsonIgnore]
+        public ThemePalette Current =>Themes.TryGetValue(Theme, out var t) ? t : Themes["Dark"];
 
         // Дозаполнить недостающие темы (если файл старый/урезанный)
         public void EnsureThemes()
@@ -82,26 +83,41 @@ namespace WebWeaver.Models
                 BtSettings.TryAdd(kv.Key, kv.Value);
         }
 
-        public static Dictionary<string, ToolbarGroup> DefaultToolbar()
+        public static Dictionary<string, List<string>> DefaultToolbar()
         {
-            var d = new Dictionary<string, ToolbarGroup>();
+            var d = new Dictionary<string, List<string>>();
             for (int i = 1; i <= 9; i++)
-                d[$"bt{i}"] = new ToolbarGroup();
+                d[$"bt{i}"] = new List<string>();
             return d;
         }
 
         /// <summary>
-        /// Заполненные группы по порядку bt1..bt9.
+        /// ВСЕ группы bt1..bt9 по порядку, включая пустые массивы.
+        /// null-значения из JSON заменяются на пустой список.
         /// </summary>
-        public List<(string Key, ToolbarGroup Group)> GetToolbarGroups()
+        public List<(string Key, List<string> Buttons)> GetToolbarGroups()
         {
             if (BtSettings == null) return new();
 
             return BtSettings
-                .OrderBy(kv => kv.Key.Length > 2 && int.TryParse(kv.Key.Substring(2), out int n)
-                             ? n : int.MaxValue)
-                .Select(kv => (kv.Key, kv.Value))
+                .OrderBy(kv => kv.Key.Length > 2 &&
+                               int.TryParse(kv.Key.Substring(2), out int n) ? n : int.MaxValue)
+                .Select(kv => (kv.Key, kv.Value ?? new List<string>()))
                 .ToList();
+        }
+
+        /// <summary>Группа кнопок тулбара.</summary>
+        public class ToolbarGroup
+        {
+            public string Content { get; set; } = "";
+            public string Tag { get; set; } = "";
+            public List<string> Button { get; set; } = new();
+
+            [JsonIgnore] // иначе System.Text.Json сериализует getter-свойства и засорит файл
+            public bool IsEmpty =>
+                string.IsNullOrWhiteSpace(Content) &&
+                (Button == null || Button.Count == 0 || Button.All(b => string.IsNullOrWhiteSpace(b)));
+
         }
     }
 
@@ -154,18 +170,22 @@ namespace WebWeaver.Models
         public string PortStroke { get; set; } = "#FFFFFF";
     }
 
-    /// <summary>Группа кнопок тулбара.</summary>
-    public class ToolbarGroup
+    /// <summary>Разобранная строка кнопки «Команда|Видимость» из btSettings.</summary>
+    public record ToolbarButtonDef(string Command, bool Visible)
     {
-        public string Content { get; set; } = "";
-        public string Title { get; set; } = "";
-        public List<string> Button { get; set; } = new();
+        public static ToolbarButtonDef Parse(string? raw)
+        {
+            var parts = (raw ?? "").Split('|');
+            string cmd = parts[0].Trim();
 
-        [JsonIgnore] // иначе System.Text.Json сериализует getter-свойства и засорит файл
-        public bool IsEmpty =>
-            string.IsNullOrWhiteSpace(Content) &&
-            (Button == null || Button.Count == 0 || Button.All(b => string.IsNullOrWhiteSpace(b)));
+            bool visible = true;
+            if (parts.Length > 1 && bool.TryParse(parts[^1].Trim(), out bool v))
+                visible = v;
 
+            return cmd.Length == 0
+                ? new ToolbarButtonDef("", false)   // пустые строки-заглушки из файла
+                : new ToolbarButtonDef(cmd, visible);
+        }
     }
 
     /// <summary>Внешний вид новой ноды по умолчанию (hex #RRGGBB).</summary>

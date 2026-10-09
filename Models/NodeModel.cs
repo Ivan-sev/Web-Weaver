@@ -8,7 +8,7 @@ namespace WebWeaver.Models
     public class NodeModel
     {
         public Guid Id { get; set; } = Guid.NewGuid();
-        public string Name { get; set; } = "Новая нода";
+        public string Name { get; set; } = Lang.DefaultName;
         public string Text { get; set; } = "";
         public double X { get; set; }
         public double Y { get; set; }
