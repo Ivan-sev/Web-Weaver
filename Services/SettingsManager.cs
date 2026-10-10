@@ -238,7 +238,12 @@ namespace WebWeaver.Services
             Saved?.Invoke();
         }
 
-        private static SettingsData ButtonWorkarounds(this SettingsData settings)
+        /// <summary>
+        /// Временный фикс бага
+        /// </summary>
+        /// <param name="settings"></param>
+        /// <returns></returns>
+        public static SettingsData ButtonWorkarounds(this SettingsData settings)
         {
             var but = settings.BtSettings;
 

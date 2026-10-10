@@ -1,4 +1,5 @@
 ﻿using Microsoft.Win32;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -2753,11 +2754,12 @@ namespace WebWeaver
             // Снимок на входе — из него откатываем при Отмене/закрытии
             var snapshot = SettingsManager.Snapshot();
             bool confirmed = false;
+            bool langChanged = false;
 
             var win = new ControlPanelWindow(Lang.SettingsTitle, new[]
             {
                 $"TextBlock|{Lang.SettingsSectionGeneral}||sect.gen|label|",
-                $"Combo|{Lang.SettingsLanguage}|{Lang.SettingsLanguageDesc}|set.language|label|{langRow};",
+                $"Combo|{Lang.SettingsLanguage}|{Lang.SettingsLanguageDesc}|set.language|label|{langRow};"+
                 $"Combo|{Lang.SettingsTheme}|{Lang.SettingsThemeDesc}|set.theme|label|{themeRow};",
                 $"TextBlock|{Lang.SettingsSectionAutosave}||sect.auto|label|;",
                 $"Check|{Lang.SettingsAutosaveEnable}|{Lang.SettingsAutosaveEnableDesc}|set.auto.enabled|label|{(s.Autosave.Enabled ? "true" : "false")};",
@@ -2792,7 +2794,7 @@ namespace WebWeaver
                 if (id == "set.auto.changes" && Num(val, out double cnt))
                     win.SetText("sect.label.changes", Lang.SettingsChangesCaption.Replace("{&}", ((int)Math.Round(cnt)).ToString()));
                 if (id == "set.language") 
-                    WebWeaver.Language.Set(val.Trim('!'));
+                    WebWeaver.Language.Set(val.Trim('!')); langChanged = true; // помечаем, что язык изменился — после закрытия окна перезапустим
             };
 
             win.Owner = this;
@@ -2802,6 +2804,13 @@ namespace WebWeaver
             {
                 SettingsManager.Save();           // Готово: актуальное состояние целиком → Settings.json
                 SetStatus(Lang.StatusSettingsSaved);
+
+                if (langChanged)
+                {
+                    MessageBox.Show(Lang.MessageBoxNotification, "", MessageBoxButton.OK, MessageBoxImage.Information);
+                    Process.Start(Process.GetCurrentProcess().MainModule.FileName); // перезапуск приложения для применения нового языка
+                    Application.Current.Shutdown();
+                }
             }
             else
             {
@@ -3124,7 +3133,6 @@ namespace WebWeaver
             popup.IsOpen = true;
         }
 
-
         public static Style BuildActionPanelButtonStyle()
         {
             var st = new Style(typeof(Button));
@@ -3175,6 +3183,8 @@ namespace WebWeaver
 
         public static void LoadButtonPanel(MainWindow window)
         {
+            SettingsManager.Settings.ButtonWorkarounds();
+
             foreach (var (key, buttons) in SettingsManager.Settings.GetToolbarGroups())
             {
                 if(buttons.Count > 0)
