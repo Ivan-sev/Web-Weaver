@@ -13,6 +13,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Language\**" />
+    <EmbeddedResource Remove="Language\**" />
+    <None Remove="Language\**" />
+    <Page Remove="Language\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="bin\Debug\net10.0-windows\Language\eng.lng" />
     <None Include="bin\Debug\net10.0-windows\Language\rus.lng" />
     <None Include="bin\Debug\net10.0-windows\Settings.json" />
@@ -23,10 +30,6 @@
     <None Update="Settings.json">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Language\" />
   </ItemGroup>
 
 </Project>
