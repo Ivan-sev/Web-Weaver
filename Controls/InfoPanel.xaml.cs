@@ -321,6 +321,7 @@ public partial class InfoPanel : UserControl
                 _current.FontFamily = ci.Content?.ToString() ?? "Segoe UI";
         }
 
+
         SaveRequested?.Invoke(_current);
     }
 
