@@ -1,5 +1,6 @@
 ﻿using Microsoft.Win32;
 using System.Diagnostics;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -57,6 +58,7 @@ namespace WebWeaver
             WebWeaver.Language.LoadLangList();
             SettingsManager.Load();
             WebWeaver.Language.Set(SettingsManager.Settings.Language);
+            AutosaveManager.Start();
 
             // ВАЖНО: до InitializeComponent
             _gridHost = new VisualHost(_gridVisual);
@@ -782,6 +784,7 @@ namespace WebWeaver
             {
                 // Новая нода
                 AddNodeControl(model);
+                SetStatus(Lang.StatusNodeCreated.Replace("{&}", model.Name));
                 PushHistory(Lang.HistoryNodeCreated);
             }
             else
@@ -1034,8 +1037,12 @@ namespace WebWeaver
             }
             else if (e.Key == Key.Y && Keyboard.Modifiers == ModifierKeys.Control)
             {
-                RedoHistory(); // бонус: привычный Ctrl+Y
+                RedoHistory();
                 e.Handled = true;
+            }
+            else if (e.Key == Key.H && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                BtnHistory();
             }
             else if (e.Key == Key.Escape && _rubberActive)
             {
@@ -1872,29 +1879,13 @@ namespace WebWeaver
             _history.Add(new HistoryEntry { Title = title, Json = json });
             if (_history.Count > MaxHistoryEntries) _history.RemoveAt(0);
             _historyIndex = _history.Count - 1;
+
+            AutosaveManager.RegisterChange();
         }
 
         // ═══════════════════════════════════════════════════════════════
         // Отмена, повтор, восстановление
         // ═══════════════════════════════════════════════════════════════
-        private void UndoHistory()
-        {
-            if (_historyIndex <= 0) { SetStatus(Lang.StatusUndoNothing); return; }
-            string undone = _history[_historyIndex].Title;
-            _historyIndex--;
-            RestoreHistory(_history[_historyIndex]);
-            SetStatus(Lang.HistoryUndone.Replace("{&}", undone));
-            PushHistory(Lang.HistoryUndone.Replace("{&}", undone));
-        }
-
-        private void RedoHistory()
-        {
-            if (_historyIndex <= 0) { SetStatus(Lang.StatusRedoNothing); return; }
-            _historyIndex++;
-            RestoreHistory(_history[_historyIndex]);
-            SetStatus(Lang.HistoryRedone.Replace("{&}", _history[_historyIndex].Title));
-            PushHistory(Lang.HistoryRedone.Replace("{&}", _history[_historyIndex].Title));
-        }
 
         private void RestoreHistory(HistoryEntry entry)
         {
@@ -2318,13 +2309,26 @@ namespace WebWeaver
         // ── Сохранение для автосейва: тихо, без прыжка в корень ──
         private void AutosaveSave()
         {
-            if (_currentFilePath == null) return; // файл ещё не выбран — пропускаем
+            if (_currentFilePath == null) return;
+            if (!AutosaveManager.IsDirty) return;
+
             SyncCurrentLevelFromCanvas();
-            System.IO.File.WriteAllText(_currentFilePath,
-                System.Text.Json.JsonSerializer.Serialize(CurrentLevel.Map,
-                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
-            SetStatus(Lang.StatusAutosaved);
+
+            try
+            {
+                System.IO.File.WriteAllText(_currentFilePath,
+                    System.Text.Json.JsonSerializer.Serialize(_mapStack[0].Map,
+                        new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+
+                AutosaveManager.MarkClean();
+                SetStatus(Lang.StatusAutosaved);
+            }
+            catch (Exception ex)
+            {
+                SetStatus(Lang.StatusRestoreFailed.Replace("{&}", ex.Message));
+            }
         }
+
 
         // ═══════════════════════════════════════════════════════════════
         // Кнопки
@@ -2582,7 +2586,7 @@ namespace WebWeaver
             //var confirmed = false;
 
             #region MyRegion
-            var cpw = new ControlPanelWindow(Lang.FindNodeSearchText, new[]
+            var cpw = new ControlPanelWindow(Lang.FindNodeSearchText, "",  new[]
             {
                 $"TextBox|{Lang.FindNodeFoundText}||Search.text||",
                 "Button2|Option1|Описание|bt2.v1|label|close;",
@@ -2746,27 +2750,29 @@ namespace WebWeaver
                 "Custom" => $"{Lang.ThemeDark},{Lang.ThemeLight},*{Lang.ThemeCustom}",
                 _ => $"*{Lang.ThemeDark},{Lang.ThemeLight},{Lang.ThemeCustom}"
             };
-
-            //string langRow = s.Language == "en" ? "Русский,*English" : "*Русский,English";
             string langRow = WebWeaver.Language.FormattedDataLang(s.Language);
-            //string langRow = WebWeaver.Language.LangList(s.Language);
 
             // Снимок на входе — из него откатываем при Отмене/закрытии
             var snapshot = SettingsManager.Snapshot();
             bool confirmed = false;
             bool langChanged = false;
+            bool avtoSaveChanged = false;
+            var version = Assembly.GetExecutingAssembly().GetName().Version.ToString().Trim('0').Trim('.');
 
-            var win = new ControlPanelWindow(Lang.SettingsTitle, new[]
+            string resInterval = s.Autosave.IntervalSeconds == 0 ? Lang.SettingsChangesDoInclude : FormatSecondsOptimized(s.Autosave.IntervalSeconds);
+            string resChanges = s.Autosave.ChangesCount == 0 ? Lang.SettingsChangesDoInclude : s.Autosave.ChangesCount.ToString();
+
+            var win = new ControlPanelWindow(Lang.SettingsTitle, "Web Weaver V" + version, new[]
             {
                 $"TextBlock|{Lang.SettingsSectionGeneral}||sect.gen|label|",
                 $"Combo|{Lang.SettingsLanguage}|{Lang.SettingsLanguageDesc}|set.language|label|{langRow};"+
                 $"Combo|{Lang.SettingsTheme}|{Lang.SettingsThemeDesc}|set.theme|label|{themeRow};",
                 $"TextBlock|{Lang.SettingsSectionAutosave}||sect.auto|label|;",
                 $"Check|{Lang.SettingsAutosaveEnable}|{Lang.SettingsAutosaveEnableDesc}|set.auto.enabled|label|{(s.Autosave.Enabled ? "true" : "false")};",
-                $"TextBlock|{Lang.SettingsIntervalCaption.Replace("{&}", FormatSecondsOptimized(s.Autosave.IntervalSeconds))}||sect.label.interval|label|;",
-                $"Slider|{Lang.SettingsIntervalName}|{Lang.SettingsIntervalDesc}|set.auto.interval|label|30,1800,{s.Autosave.IntervalSeconds},5;",
-                $"TextBlock|{Lang.SettingsChangesCaption.Replace("{&}", s.Autosave.ChangesCount.ToString())}||sect.label.changes|label|;",
-                $"Slider|{Lang.SettingsChangesName}|{Lang.SettingsChangesDesc}|set.auto.changes|label|5,200,{s.Autosave.ChangesCount},1;",
+                $"TextBlock|{Lang.SettingsIntervalCaption.Replace("{&}", resInterval)}||sect.label.interval|label|;",
+                $"Slider|{Lang.SettingsIntervalName}|{Lang.SettingsIntervalDesc}|set.auto.interval|label|0,1800,{s.Autosave.IntervalSeconds},30;",
+                $"TextBlock|{Lang.SettingsChangesCaption.Replace("{&}", resChanges)}||sect.label.changes|label|;",
+                $"Slider|{Lang.SettingsChangesName}|{Lang.SettingsChangesDesc}|set.auto.changes|label|0,200,{s.Autosave.ChangesCount},5;",
                 $"TextBlock|{Lang.SettingsSectionNodeColors}||sect.node|label|;",
                 $"TextBox|{Lang.SettingsNodeBg}|{Lang.SettingsNodeBgDesc}|set.node.bg|label|{s.NodeDefaults.Background};"+
                 $"TextBox|{Lang.SettingsNodeHeader}|{Lang.SettingsNodeHeaderDesc}|set.node.header|label|{s.NodeDefaults.Header};"+
@@ -2776,6 +2782,12 @@ namespace WebWeaver
                 $"Button|{Lang.PanelCancel}|{Lang.SettingsCancelDesc}|btn.cancel|label|close;"
             });
 
+            if (!s.Autosave.Enabled)
+            {
+                win.SetEnabled("set.auto.interval", false);
+                win.SetEnabled("set.auto.changes", false);
+            }// скрыть недоступные элементы
+            
             win.ValueChanged += result =>
             {
                 var parts = result.Split(new[] { ' ' }, 2);
@@ -2790,11 +2802,47 @@ namespace WebWeaver
                 // Живые подписи слайдеров
                 string val = parts.Length > 1 ? parts[1] : "";
                 if (id == "set.auto.interval" && Num(val, out double sec))
+                {
                     win.SetText("sect.label.interval", Lang.SettingsIntervalCaption.Replace("{&}", FormatSecondsOptimized((int)Math.Round(sec))));
+                    //Lang.SettingsChangesDoInclude
+                    if (sec == 0) 
+                    {
+                        win.SetSlider("set.auto.changes", min: 5);
+                        win.SetText("sect.label.interval", Lang.SettingsIntervalCaption.Replace("{&}", Lang.SettingsChangesDoInclude));
+                    }
+                    else
+                    {
+                        win.SetSlider("set.auto.changes", min: 0);
+                    }
+                }          
                 if (id == "set.auto.changes" && Num(val, out double cnt))
+                {
                     win.SetText("sect.label.changes", Lang.SettingsChangesCaption.Replace("{&}", ((int)Math.Round(cnt)).ToString()));
-                if (id == "set.language") 
-                    WebWeaver.Language.Set(val.Trim('!')); langChanged = true; // помечаем, что язык изменился — после закрытия окна перезапустим
+                    
+                    if (cnt == 0)
+                    {
+                        win.SetSlider("set.auto.interval", min: 30);
+                        win.SetText("sect.label.changes", Lang.SettingsChangesCaption.Replace("{&}", Lang.SettingsChangesDoInclude));
+                    }
+                    else
+                    {
+                        win.SetSlider("set.auto.interval", min: 0);
+                    }
+                }
+                    
+                if (id == "set.language")
+                { 
+                    WebWeaver.Language.Set(val.Trim('!')); 
+                    langChanged = true; // помечаем, что язык изменился — после закрытия окна перезапустим
+                } 
+                if (id == "set.auto.enabled")
+                {
+                    avtoSaveChanged = (val == "True" ? true : false);
+
+                    win.SetEnabled("set.auto.interval", avtoSaveChanged); 
+                    win.SetEnabled("set.auto.changes", avtoSaveChanged);
+                }
+
             };
 
             win.Owner = this;
@@ -2802,8 +2850,9 @@ namespace WebWeaver
 
             if (confirmed)
             {
-                SettingsManager.Save();           // Готово: актуальное состояние целиком → Settings.json
+                SettingsManager.Save();
                 SetStatus(Lang.StatusSettingsSaved);
+                AutosaveManager.Start();
 
                 if (langChanged)
                 {
@@ -2819,6 +2868,29 @@ namespace WebWeaver
             }
 
             LoadButtonPanel(this);
+        }
+
+        private void UndoHistory()
+        {
+            if (_historyIndex <= 0) { SetStatus(Lang.StatusUndoNothing); return; }
+            string undone = _history[_historyIndex].Title;
+            _historyIndex--;
+            RestoreHistory(_history[_historyIndex]);
+            SetStatus(Lang.HistoryUndone.Replace("{&}", undone));
+            PushHistory(Lang.HistoryUndone.Replace("{&}", undone));
+        }
+
+        private void RedoHistory()
+        {
+            if (_historyIndex <= 0) { SetStatus(Lang.StatusRedoNothing); return; }
+            _historyIndex++;
+            if (_historyIndex < _history.Count)
+            {
+                RestoreHistory(_history[_historyIndex]);
+                SetStatus(Lang.HistoryRedone.Replace("{&}", _history[_historyIndex].Title));
+                PushHistory(Lang.HistoryRedone.Replace("{&}", _history[_historyIndex].Title));
+            }
+            else { SetStatus("(┬┬﹏┬┬)"); }
         }
 
         private void Settings_ValueChanged(string result)
@@ -3175,6 +3247,9 @@ namespace WebWeaver
                 case "BtnZoomIn": ZoomAt(AppSettings.ZoomStep); break; // + зумм
                 case "BtnZoomOut": ZoomAt(-AppSettings.ZoomStep); break; //  - зумм
 
+                case "UndoHistory": UndoHistory(); break; // Вернуть назад
+                case "RedoHistory": RedoHistory(); break; // Повторить
+
                 default:
                     SetStatus(Lang.StatusPressButton.Replace("{&}", id));
                     break;
@@ -3222,6 +3297,8 @@ namespace WebWeaver
                             "BtnResetView" => String.Join('|', Lang.BtnResetView) + "|" + buttons[i],
                             "BtnZoomIn" => String.Join('|', Lang.BtnZoomIn) + "|" + buttons[i],
                             "BtnZoomOut" => String.Join('|', Lang.BtnZoomOut) + "|" + buttons[i],
+                            "UndoHistory" => String.Join('|', Lang.UndoHistory) + "|" + buttons[i],
+                            "RedoHistory" => String.Join('|', Lang.RedoHistory) + "|" + buttons[i],
                             _ => btn[0]
                         };
                     }
