@@ -35,6 +35,21 @@ namespace WebWeaver
             if (_textSetters.TryGetValue(id, out var set)) set(text);
         }
 
+        /// <summary>
+        /// Живая правка слайдера: min, max, value, шаг. null — не трогать.
+        /// value автоматически зажимается в [min,max].
+        /// </summary>
+        public void SetSlider(string id, double? min = null, double? max = null,
+                              double? value = null, double? frequency = null)
+        {
+            if (!_elements.TryGetValue(id, out var el) || el is not Slider s) return;
+
+            if (min.HasValue) s.Minimum = min.Value;   // RangeBase сам корректирует Value/Maximum
+            if (max.HasValue) s.Maximum = max.Value;
+            if (frequency.HasValue) s.TickFrequency = frequency.Value;
+            if (value.HasValue) s.Value = Math.Clamp(value.Value, s.Minimum, s.Maximum);
+        }
+
         /// <summary>Доступ к любому элементу по id — на будущее.</summary>
         public T? GetElement<T>(string id) where T : FrameworkElement =>
             _elements.TryGetValue(id, out var el) ? el as T : null;
@@ -230,11 +245,11 @@ namespace WebWeaver
         }
         #endregion
 
-        public ControlPanelWindow(string title, params string[] rows)
+        public ControlPanelWindow(string title, string panelTitle, params string[] rows)
         {
             InitializeComponent();
             Title = title;
-            tbTitle.Text = title;
+            tbTitle.Text = panelTitle;
 
             MinWidth = 380;
             MaxWidth = 560;
@@ -245,11 +260,11 @@ namespace WebWeaver
         }
 
         // ── Быстрый вызов: Owner и ShowDialog внутри ──
-        public static void Show(string title, string[] rows,
+        public static void Show(string title, string ptitle, string[] rows,
                                 Window? owner = null,
                                 Action<string>? onValueChanged = null)
         {
-            var win = new ControlPanelWindow(title, rows);
+            var win = new ControlPanelWindow(title, ptitle, rows);
             if (onValueChanged != null) win.ValueChanged += onValueChanged;
             if (owner != null) win.Owner = owner;
             win.ShowDialog();
