@@ -304,6 +304,8 @@ namespace WebWeaver
         public static string[] BtnResetView { get; set; } = { "⊡ Сброс вида", "Сбросить масштаб и положение (Ctrl+Home)" };
         public static string[] BtnZoomIn { get; set; } = { "🔍＋", "Приблизить (Ctrl+)" };
         public static string[] BtnZoomOut { get; set; } = { "🔍−", "Отдалить (Ctrl-)" };
+        public static string[] UndoHistory { get; set; } = { "↩", "Вернуть назад" };
+        public static string[] RedoHistory { get; set; } = { "↪", "Повторить действие" };
         #endregion
 
         #region Блокнот (дополнение к существующему региону)
@@ -341,6 +343,7 @@ namespace WebWeaver
 
         #region Статус-бар
         public static string StatusReady { get; set; } = "Готово";
+        public static string StatusNodeCreated { get; set; } = "Создана нода «{&}»";
         public static string StatusReadyHint { get; set; } = "Готово. ПКМ по карте — создать ноду.";
         public static string StatusSelectionCleared { get; set; } = "Выделение снято";
         public static string StatusRubberCancelled { get; set; } = "Выделение отменено.";
@@ -462,6 +465,7 @@ namespace WebWeaver
         public static string SettingsIntervalName { get; set; } = "Интервал, сек";
         public static string SettingsIntervalDesc { get; set; } = "Пауза между автосохранениями";
         public static string SettingsChangesCaption { get; set; } = "После изменений: {&}";
+        public static string SettingsChangesDoInclude { get; set; } = "(не учитываем)";
         public static string SettingsChangesName { get; set; } = "После изменений";
         public static string SettingsChangesDesc { get; set; } = "Сохранять после N изменений";
         public static string SettingsSectionNodeColors { get; set; } = "Цвета нод по умолчанию";
